@@ -42,6 +42,8 @@ class AuthRepositoryImpl @Inject constructor(
             }
         }
 
+    override fun observeUnsyncedCount(): Flow<Int> = userDao.observeUnsyncedCount()
+
     override suspend fun getCurrentUser(): User? = withContext(ioDispatcher) {
         val userId = syncPreferencesRepository.sessionUserId.first() ?: return@withContext null
         userDao.getById(userId)?.takeIf { it.isActive }?.toDomain()

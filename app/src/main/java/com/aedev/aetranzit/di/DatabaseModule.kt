@@ -2,7 +2,9 @@ package com.aedev.aetranzit.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.withTransaction
 import com.aedev.aetranzit.data.local.AeTranzitDatabase
+import com.aedev.aetranzit.data.local.DatabaseTransactionRunner
 import com.aedev.aetranzit.data.local.dao.BusDao
 import com.aedev.aetranzit.data.local.dao.RouteDao
 import com.aedev.aetranzit.data.local.dao.TicketDao
@@ -28,6 +30,15 @@ object DatabaseModule {
         AeTranzitDatabase::class.java,
         "aetranzit.db"
     ).build()
+
+    @Provides
+    @Singleton
+    fun provideDatabaseTransactionRunner(
+        database: AeTranzitDatabase
+    ): DatabaseTransactionRunner = object : DatabaseTransactionRunner {
+        override suspend fun <T> runInTransaction(block: suspend () -> T): T =
+            database.withTransaction { block() }
+    }
 
     @Provides
     fun provideUserDao(database: AeTranzitDatabase): UserDao = database.userDao()

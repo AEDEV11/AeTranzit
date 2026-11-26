@@ -9,7 +9,9 @@ plugins {
 android {
     namespace = "com.aedev.aetranzit"
     compileSdk {
-        version = release(37)
+        version = release(37) {
+            minorApiLevel = 1
+        }
     }
 
     defaultConfig {
@@ -77,6 +79,9 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)
+
+    // QR Code Generation (Offline ZXing Core)
+    implementation(libs.zxing.core)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -132,7 +132,7 @@ fun SettingsContent(
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 Text(
-                                    text = "Project: aetranzit • Local Room DB stays SSOT",
+                                    text = "Syncs Users, Buses, Routes, Trips & Tickets • Room stays SSOT",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -146,6 +146,14 @@ fun SettingsContent(
                     }
 
                     Spacer(modifier = Modifier.height(AeDimens.SpaceMd))
+
+                    Text(
+                        text = "Pending local changes: ${uiState.pendingSyncCount}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.height(AeDimens.SpaceXs))
 
                     Text(
                         text = "Last synced: $lastSyncLabel",
@@ -187,7 +195,8 @@ private fun SettingsContentPreview() {
         SettingsContent(
             uiState = SettingsUiState(
                 isCloudSyncEnabled = true,
-                syncStatusMessage = "Everything is up to date."
+                pendingSyncCount = 3,
+                syncStatusMessage = "Everything is up to date (Users, Buses, Routes, Trips & Tickets)."
             ),
             onEvent = {},
             onNavigateBack = {}

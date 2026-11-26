@@ -16,7 +16,16 @@ interface RouteDao {
     fun observeAll(): Flow<List<RouteEntity>>
 
     @Query("SELECT * FROM routes WHERE id = :id LIMIT 1")
+    fun observeById(id: String): Flow<RouteEntity?>
+
+    @Query("SELECT * FROM routes WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): RouteEntity?
+
+    @Query("DELETE FROM routes WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("UPDATE routes SET isSynced = 1, updatedAt = :syncedAt WHERE id = :id")
+    suspend fun markSynced(id: String, syncedAt: Long)
 
     @Query("SELECT * FROM routes WHERE isSynced = 0")
     suspend fun getUnsynced(): List<RouteEntity>

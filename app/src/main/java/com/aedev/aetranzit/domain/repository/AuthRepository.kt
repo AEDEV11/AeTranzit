@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface AuthRepository {
     fun observeCurrentUser(): Flow<User?>
+    fun observeUnsyncedCount(): Flow<Int>
     suspend fun getCurrentUser(): User?
     suspend fun login(email: String, password: String): Result<User>
     suspend fun register(name: String, email: String, password: String, role: UserRole): Result<User>

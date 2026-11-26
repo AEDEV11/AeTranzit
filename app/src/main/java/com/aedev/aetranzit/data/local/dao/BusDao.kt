@@ -16,7 +16,16 @@ interface BusDao {
     fun observeAll(): Flow<List<BusEntity>>
 
     @Query("SELECT * FROM buses WHERE id = :id LIMIT 1")
+    fun observeById(id: String): Flow<BusEntity?>
+
+    @Query("SELECT * FROM buses WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): BusEntity?
+
+    @Query("DELETE FROM buses WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("UPDATE buses SET isSynced = 1, updatedAt = :syncedAt WHERE id = :id")
+    suspend fun markSynced(id: String, syncedAt: Long)
 
     @Query("SELECT * FROM buses WHERE isSynced = 0")
     suspend fun getUnsynced(): List<BusEntity>

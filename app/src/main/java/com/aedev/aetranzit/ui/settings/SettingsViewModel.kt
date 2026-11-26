@@ -3,7 +3,11 @@ package com.aedev.aetranzit.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aedev.aetranzit.domain.repository.AuthRepository
+import com.aedev.aetranzit.domain.repository.BusRepository
+import com.aedev.aetranzit.domain.repository.RouteRepository
 import com.aedev.aetranzit.domain.repository.SyncPreferencesRepository
+import com.aedev.aetranzit.domain.repository.TicketRepository
+import com.aedev.aetranzit.domain.repository.TripRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -17,6 +21,7 @@ import javax.inject.Inject
 data class SettingsUiState(
     val isCloudSyncEnabled: Boolean = false,
     val lastSyncedAt: Long? = null,
+    val pendingSyncCount: Int = 0,
     val isSyncing: Boolean = false,
     val syncStatusMessage: String? = null,
     val isSyncError: Boolean = false
@@ -36,19 +41,35 @@ private data class SyncOperationState(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val syncPreferencesRepository: SyncPreferencesRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val busRepository: BusRepository,
+    private val routeRepository: RouteRepository,
+    private val tripRepository: TripRepository,
+    private val ticketRepository: TicketRepository
 ) : ViewModel() {
 
     private val syncOpState = MutableStateFlow(SyncOperationState())
 
+    private val pendingSyncCountFlow = combine(
+        authRepository.observeUnsyncedCount(),
+        busRepository.observeUnsyncedCount(),
+        routeRepository.observeUnsyncedCount(),
+        tripRepository.observeUnsyncedCount(),
+        ticketRepository.observeUnsyncedCount()
+    ) { users, buses, routes, trips, tickets ->
+        users + buses + routes + trips + tickets
+    }
+
     val uiState: StateFlow<SettingsUiState> = combine(
         syncPreferencesRepository.isCloudSyncEnabled,
         syncPreferencesRepository.lastSyncedAt,
+        pendingSyncCountFlow,
         syncOpState
-    ) { enabled, lastSyncedAt, op ->
+    ) { enabled, lastSyncedAt, pendingCount, op ->
         SettingsUiState(
             isCloudSyncEnabled = enabled,
             lastSyncedAt = lastSyncedAt,
+            pendingSyncCount = pendingCount,
             isSyncing = op.isSyncing,
             syncStatusMessage = op.message,
             isSyncError = op.isError
@@ -82,25 +103,40 @@ class SettingsViewModel @Inject constructor(
         if (syncOpState.value.isSyncing) return
         viewModelScope.launch {
             syncOpState.value = SyncOperationState(isSyncing = true)
-            authRepository.syncPendingUsers()
-                .onSuccess { syncedCount ->
-                    syncOpState.value = SyncOperationState(
-                        isSyncing = false,
-                        message = if (syncedCount == 0) {
-                            "Everything is up to date."
-                        } else {
-                            "Synced $syncedCount record(s) to cloud."
-                        },
-                        isError = false
-                    )
-                }
-                .onFailure { error ->
-                    syncOpState.value = SyncOperationState(
-                        isSyncing = false,
-                        message = error.message ?: "Cloud sync failed.",
-                        isError = true
-                    )
-                }
+
+            val results = listOf(
+                authRepository.syncPendingUsers(),
+                busRepository.syncPendingBuses(),
+                routeRepository.syncPendingRoutes(),
+                tripRepository.syncPendingTrips(),
+                ticketRepository.syncPendingTickets()
+            )
+
+            val firstFailure = results.firstOrNull { it.isFailure }?.exceptionOrNull()
+            val totalSynced = results.sumOf { it.getOrDefault(0) }
+
+            if (firstFailure != null && totalSynced == 0) {
+                syncOpState.value = SyncOperationState(
+                    isSyncing = false,
+                    message = firstFailure.message ?: "Cloud sync failed.",
+                    isError = true
+                )
+            } else {
+                val syncedAt = System.currentTimeMillis()
+                syncPreferencesRepository.updateLastSyncedAt(syncedAt)
+                syncOpState.value = SyncOperationState(
+                    isSyncing = false,
+                    message = when {
+                        firstFailure != null ->
+                            "Partially synced $totalSynced record(s); some items failed (${firstFailure.message})."
+                        totalSynced == 0 ->
+                            "Everything is up to date (Users, Buses, Routes, Trips & Tickets)."
+                        else ->
+                            "Synced $totalSynced record(s) to cloud (Users, Buses, Routes, Trips & Tickets)."
+                    },
+                    isError = firstFailure != null
+                )
+            }
         }
     }
 }
