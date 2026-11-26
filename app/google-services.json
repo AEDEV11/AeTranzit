@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "967637749603",
+    "project_id": "aetranzit",
+    "storage_bucket": "aetranzit.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:967637749603:android:fd4003b6c79f5746854d56",
+        "android_client_info": {
+          "package_name": "com.aedev.aetranzit"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDYgDzN-fwjoDIIp7XQ6E3OBqFdZAkxt34"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
