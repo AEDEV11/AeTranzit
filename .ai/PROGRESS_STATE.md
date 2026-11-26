@@ -3,8 +3,8 @@
 > **Mandatory Rule:** Update this file at the end of every completed task or before context compaction so a fresh session can resume with 100% accuracy and zero amnesia.
 
 ## Current Phase
-- **Phase 4: Digital Ticket Rendering & Sharing (Bitmap, Share Sheet, SMS, ZXing QR)** — **Completed**
-- **Next Up:** **Phase 5: Admin Dashboard (Vico Analytics, Fleet/User Management)**
+- **Phase 5: Admin Dashboard (Vico Analytics, Reports CSV/PDF Export & Staff Management)** — **Completed**
+- **Next Up:** **Phase 6: Security Rules, Edge-Case QA & Verification**
 
 ## Completed Features
 - [x] **Phase 0:** Context Engineering & Agent Guardrails (`AGENTS.md`, `.ai/*`, `.ai/skills/*`)
@@ -37,36 +37,49 @@
   - [x] Built `DigitalTicketViewModel` & `DigitalTicketScreen` (`ui/conductor/ticket/`): sunlight-legible ticket card, pure-white QR code surface in both Light & Dark themes, `>= 48.dp` one-tap action bar (**Share Ticket Image**, **Send SMS Receipt**, **Back to Seat Map**), error banner/snackbar, and Light + Dark `@Preview`s
   - [x] Wired `CONDUCTOR_DIGITAL_TICKET` (`conductor_digital_ticket/{ticketId}`) in `AeTranzitRoutes` & `AeTranzitNavHost` (strictly role-gated to `CONDUCTOR`) and connected `ConductorTicketingScreen(onOpenDigitalTicket = ...)`
   - [x] Added unit tests (`TicketPayloadFormatterTest`, `QrCodeGeneratorTest` with ZXing `QRCodeReader` round-trip verification, `DigitalTicketViewModelTest`, and `TicketRepositoryImplTest` `observeTicketById` test) — **38/38 total unit tests passing** + `:app:assembleDebug` **BUILD SUCCESSFUL**
+- [x] **Phase 5: Admin Analytics (Vico Charts), Reports (CSV/PDF Export) & Staff Management**
+  - [x] Added **Vico Compose M3 `3.3.1`** (`com.patrykandpatrick.vico:compose` + `com.patrykandpatrick.vico:compose-m3`) to `gradle/libs.versions.toml` and `app/build.gradle.kts`
+  - [x] Added `<cache-path name="shared_reports" path="reports/" />` to `app/src/main/res/xml/file_paths.xml` for `FileProvider` CSV/PDF sharing
+  - [x] Extended `UserDao` (`observeAll`, `updateActiveStatus`), `TripDao` (`observeAll`), `TicketDao` (`observeAll`), `AuthRepository` / `AuthRepositoryImpl` (`observeAllUsers`, `setUserActiveStatus` with self-deactivation guard + optional Firestore sync), `TripRepository` / `TripRepositoryImpl` (`observeAllTrips`), and `TicketRepository` / `TicketRepositoryImpl` (`observeAllTickets`) while keeping Room DB at `version = 1`
+  - [x] Implemented pure JVM-testable `AnalyticsDateRange`, `BuildAdminAnalyticsUseCase` (date-range filtering, revenue, ticket counts, discounted share, active trips/load factor, chronological daily revenue points, ranked top destinations, conductor summaries), `ReportExportFormatter` (RFC-4180 CSV builder), and `ReportFileExporter` (`exportCsvAndShare` + native `PdfDocument` `exportPdfAndShare`)
+  - [x] Upgraded `AdminDashboardViewModel` & `AdminDashboardScreen` into an Admin Operations Hub with date-range filter chips, 2x2 KPI grid (`TabularAmountStyle` + `formatPhp`), Vico `CartesianChartHost` column revenue chart + empty state, Passenger Mix & Top Drop-Offs card, Conductor Shift Performance card, and navigation cards (**Reports & Exports**, **Manage Staff**, **Manage Buses**, **Manage Routes**) + `@Preview`s
+  - [x] Built `AdminReportsViewModel` & `AdminReportsScreen` (`ui/admin/reports/`) with date-range/bus/conductor filters, live revenue/ticket summary bar, `>= 48.dp` **Export CSV** & **Export PDF** buttons, filtered ticket `LazyColumn`, and `@Preview`s
+  - [x] Built `ManageStaffViewModel` & `ManageStaffScreen` (`ui/admin/staff/`) with role badges (`ADMIN`/`CONDUCTOR`), sync status indicator, Active/Deactivated badges, activation `Switch` blocking self-deactivation of the logged-in Admin, and `@Preview`s
+  - [x] Wired `ADMIN_REPORTS` and `ADMIN_STAFF` in `AeTranzitRoutes` & `AeTranzitNavHost` (strictly role-gated to `ADMIN`)
+  - [x] Added unit tests (`BuildAdminAnalyticsUseCaseTest`, `ReportExportFormatterTest`, `ManageStaffViewModelTest`) — **46/46 total unit tests passing** + `:app:assembleDebug` **BUILD SUCCESSFUL**
 
 ## Phase Roadmap & Checklist
 - [x] **Phase 1: Auth & Setup**
 - [x] **Phase 2: Core Domain, Bus/Route Management & Active Trip Flow**
 - [x] **Phase 3: Conductor Ticketing Flow (Seat Map, Fare/20% Discount/Change Calc, Atomic Issuance)**
 - [x] **Phase 4: Digital Ticket Rendering & Sharing (Bitmap, Share Sheet, SMS, ZXing QR)**
-- [ ] **Phase 5: Admin Dashboard (Vico Analytics, Fleet/User Management)**
+- [x] **Phase 5: Admin Dashboard (Vico Analytics, Fleet/User Management)**
 - [ ] **Phase 6: Security Rules, Edge-Case QA & Verification**
 
 ## Active Task
-- None (Ready for Phase 5 upon user instruction).
+- None (Ready for Phase 6 upon user instruction).
 
 ## Known Bugs / Open Questions
 - None blocking.
 
-## Exact File Paths Modified / Created (Phase 4)
+## Exact File Paths Modified / Created (Phase 5)
 - `gradle/libs.versions.toml` (updated)
 - `app/build.gradle.kts` (updated)
-- `app/src/main/AndroidManifest.xml` (updated)
-- `app/src/main/res/xml/file_paths.xml` (created)
-- `app/src/main/java/com/aedev/aetranzit/data/local/dao/TicketDao.kt` (updated)
-- `app/src/main/java/com/aedev/aetranzit/domain/repository/TicketRepository.kt` (updated)
-- `app/src/main/java/com/aedev/aetranzit/data/repository/TicketRepositoryImpl.kt` (updated)
-- `app/src/main/java/com/aedev/aetranzit/domain/usecase/TicketPayloadFormatter.kt` (created)
-- `app/src/main/java/com/aedev/aetranzit/ui/theme/{Color,Dimens}.kt` (updated)
-- `app/src/main/java/com/aedev/aetranzit/ui/conductor/ticket/{QrCodeGenerator,DigitalTicketBitmapRenderer,TicketShareHelper,DigitalTicketViewModel,DigitalTicketScreen}.kt` (created)
-- `app/src/main/java/com/aedev/aetranzit/ui/conductor/ConductorTicketingScreen.kt` (updated)
+- `app/src/main/res/xml/file_paths.xml` (updated)
+- `app/src/main/java/com/aedev/aetranzit/ui/theme/Dimens.kt` (updated)
+- `app/src/main/java/com/aedev/aetranzit/data/local/dao/{UserDao,TripDao,TicketDao}.kt` (updated)
+- `app/src/main/java/com/aedev/aetranzit/data/remote/FirebaseAuthSyncDataSource.kt` (updated)
+- `app/src/main/java/com/aedev/aetranzit/domain/repository/{AuthRepository,TripRepository,TicketRepository}.kt` (updated)
+- `app/src/main/java/com/aedev/aetranzit/data/repository/{AuthRepositoryImpl,TripRepositoryImpl,TicketRepositoryImpl}.kt` (updated)
+- `app/src/main/java/com/aedev/aetranzit/domain/usecase/{AnalyticsDateRange,BuildAdminAnalyticsUseCase,ReportExportFormatter}.kt` (created)
+- `app/src/main/java/com/aedev/aetranzit/ui/admin/{AdminDashboardViewModel,AdminDashboardScreen}.kt` (updated)
+- `app/src/main/java/com/aedev/aetranzit/ui/admin/reports/{ReportFileExporter,AdminReportsViewModel,AdminReportsScreen}.kt` (created)
+- `app/src/main/java/com/aedev/aetranzit/ui/admin/staff/{ManageStaffViewModel,ManageStaffScreen}.kt` (created)
 - `app/src/main/java/com/aedev/aetranzit/ui/navigation/{AeTranzitRoutes,AeTranzitNavHost}.kt` (updated)
-- `app/src/test/java/com/aedev/aetranzit/domain/usecase/TicketPayloadFormatterTest.kt` (created)
-- `app/src/test/java/com/aedev/aetranzit/ui/conductor/ticket/{QrCodeGeneratorTest,DigitalTicketViewModelTest}.kt` (created)
-- `app/src/test/java/com/aedev/aetranzit/data/repository/TicketRepositoryImplTest.kt` (updated)
+- `app/src/test/java/com/aedev/aetranzit/domain/usecase/{BuildAdminAnalyticsUseCaseTest,ReportExportFormatterTest}.kt` (created)
+- `app/src/test/java/com/aedev/aetranzit/ui/admin/staff/ManageStaffViewModelTest.kt` (created)
+- `app/src/test/java/com/aedev/aetranzit/ui/auth/AuthViewModelTest.kt` (updated)
 - `app/src/test/java/com/aedev/aetranzit/ui/conductor/ConductorTicketingViewModelTest.kt` (updated)
+- `app/src/test/java/com/aedev/aetranzit/ui/conductor/ticket/DigitalTicketViewModelTest.kt` (updated)
+- `app/src/test/java/com/aedev/aetranzit/data/repository/{TicketRepositoryImplTest,TripRepositoryImplTest}.kt` (updated)
 - `.ai/PROGRESS_STATE.md` (updated)
