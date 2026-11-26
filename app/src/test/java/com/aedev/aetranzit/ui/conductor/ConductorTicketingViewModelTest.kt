@@ -173,6 +173,8 @@ private class FakeTripRepo : TripRepository {
         )
     )
 
+    override fun observeAllTrips(): Flow<List<Trip>> = trip.map { listOfNotNull(it) }
+
     override fun observeTripById(tripId: String): Flow<Trip?> =
         trip.map { it?.takeIf { t -> t.id == tripId } }
 
@@ -249,6 +251,8 @@ private class FakeRouteRepo : RouteRepository {
 
 private class FakeTicketRepo : TicketRepository {
     private val tickets = MutableStateFlow<List<Ticket>>(emptyList())
+
+    override fun observeAllTickets(): Flow<List<Ticket>> = tickets
 
     override fun observeTicketById(ticketId: String): Flow<Ticket?> =
         tickets.map { list -> list.firstOrNull { it.id == ticketId } }

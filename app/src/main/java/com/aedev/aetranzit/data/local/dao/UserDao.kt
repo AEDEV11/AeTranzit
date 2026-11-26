@@ -24,6 +24,12 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE id = :id LIMIT 1")
     fun observeById(id: String): Flow<UserEntity?>
 
+    @Query("SELECT * FROM users ORDER BY role ASC, name ASC")
+    fun observeAll(): Flow<List<UserEntity>>
+
+    @Query("UPDATE users SET isActive = :isActive, isSynced = 0, updatedAt = :updatedAt WHERE id = :userId")
+    suspend fun updateActiveStatus(userId: String, isActive: Boolean, updatedAt: Long)
+
     @Query("SELECT * FROM users WHERE isSynced = 0")
     suspend fun getUnsynced(): List<UserEntity>
 

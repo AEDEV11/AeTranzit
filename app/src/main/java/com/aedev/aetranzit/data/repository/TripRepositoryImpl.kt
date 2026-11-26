@@ -31,6 +31,9 @@ class TripRepositoryImpl @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : TripRepository {
 
+    override fun observeAllTrips(): Flow<List<Trip>> =
+        tripDao.observeAll().map { list -> list.map { it.toDomain() } }
+
     override fun observeTripById(tripId: String): Flow<Trip?> =
         tripDao.observeById(tripId).map { it?.toDomain() }
 

@@ -5,6 +5,7 @@ import com.aedev.aetranzit.domain.model.Ticket
 import kotlinx.coroutines.flow.Flow
 
 interface TicketRepository {
+    fun observeAllTickets(): Flow<List<Ticket>>
     fun observeTicketById(ticketId: String): Flow<Ticket?>
     fun observeTicketsByTrip(tripId: String): Flow<List<Ticket>>
     fun observeActiveTicketsByTrip(tripId: String): Flow<List<Ticket>>

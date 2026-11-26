@@ -16,6 +16,8 @@ import com.aedev.aetranzit.domain.model.UserRole
 import com.aedev.aetranzit.ui.admin.AdminDashboardScreen
 import com.aedev.aetranzit.ui.admin.ManageBusesScreen
 import com.aedev.aetranzit.ui.admin.ManageRoutesScreen
+import com.aedev.aetranzit.ui.admin.reports.AdminReportsScreen
+import com.aedev.aetranzit.ui.admin.staff.ManageStaffScreen
 import com.aedev.aetranzit.ui.auth.LoginScreen
 import com.aedev.aetranzit.ui.auth.RegisterScreen
 import com.aedev.aetranzit.ui.auth.SplashScreen
@@ -86,6 +88,16 @@ fun AeTranzitNavHost(
             AdminDashboardScreen(
                 userName = sessionState.currentUser?.name ?: "Admin",
                 isCloudSyncEnabled = sessionState.isCloudSyncEnabled,
+                onOpenReports = {
+                    navController.navigate(AeTranzitRoutes.ADMIN_REPORTS) {
+                        launchSingleTop = true
+                    }
+                },
+                onOpenManageStaff = {
+                    navController.navigate(AeTranzitRoutes.ADMIN_STAFF) {
+                        launchSingleTop = true
+                    }
+                },
                 onOpenManageBuses = {
                     navController.navigate(AeTranzitRoutes.ADMIN_BUSES) {
                         launchSingleTop = true
@@ -102,6 +114,28 @@ fun AeTranzitNavHost(
                     }
                 },
                 onLogout = { sessionViewModel.logout(navigateToLoginReset) }
+            )
+        }
+
+        composable(AeTranzitRoutes.ADMIN_REPORTS) {
+            val currentRole = sessionState.currentUser?.role
+            if (currentRole != null && currentRole != UserRole.ADMIN) {
+                LaunchedEffect(currentRole) { navigateToRoleHome(currentRole) }
+                return@composable
+            }
+            AdminReportsScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(AeTranzitRoutes.ADMIN_STAFF) {
+            val currentRole = sessionState.currentUser?.role
+            if (currentRole != null && currentRole != UserRole.ADMIN) {
+                LaunchedEffect(currentRole) { navigateToRoleHome(currentRole) }
+                return@composable
+            }
+            ManageStaffScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 

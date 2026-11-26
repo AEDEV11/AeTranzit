@@ -202,6 +202,8 @@ class DigitalTicketViewModelTest {
             )
         )
 
+        override fun observeAllTickets(): Flow<List<Ticket>> = tickets
+
         override fun observeTicketById(ticketId: String): Flow<Ticket?> =
             tickets.map { list -> list.firstOrNull { it.id == ticketId } }
 
@@ -247,6 +249,8 @@ class DigitalTicketViewModelTest {
             isSynced = true,
             updatedAt = 1_764_140_000_000L
         )
+
+        override fun observeAllTrips(): Flow<List<Trip>> = MutableStateFlow(listOf(trip))
 
         override fun observeTripById(tripId: String): Flow<Trip?> =
             MutableStateFlow(trip.takeIf { it.id == tripId })
@@ -325,6 +329,7 @@ class DigitalTicketViewModelTest {
         )
 
         override fun observeCurrentUser(): Flow<User?> = MutableStateFlow(conductor)
+        override fun observeAllUsers(): Flow<List<User>> = MutableStateFlow(listOf(conductor))
         override fun observeUnsyncedCount(): Flow<Int> = MutableStateFlow(0)
         override suspend fun getCurrentUser(): User = conductor
         override suspend fun login(email: String, password: String) = Result.success(conductor)
@@ -334,6 +339,8 @@ class DigitalTicketViewModelTest {
             password: String,
             role: UserRole
         ) = Result.success(conductor)
+        override suspend fun setUserActiveStatus(userId: String, isActive: Boolean) =
+            Result.success(Unit)
         override suspend fun syncPendingUsers(): Result<Int> = Result.success(0)
         override suspend fun logout() = Unit
     }

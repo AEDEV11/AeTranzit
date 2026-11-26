@@ -27,6 +27,8 @@ object AeDimens {
     val TicketSeatBadgeMinWidth = 76.dp
     val QrCodeSize = 208.dp
     val QrContainerPadding = 12.dp
+    val ChartHeight = 200.dp
+    val LinearBarHeight = 8.dp
     val CardElevation = 2.dp
     val BorderWidth = 1.dp
     val BorderWidthThick = 2.dp

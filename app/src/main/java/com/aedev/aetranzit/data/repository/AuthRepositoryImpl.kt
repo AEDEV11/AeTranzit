@@ -42,6 +42,9 @@ class AuthRepositoryImpl @Inject constructor(
             }
         }
 
+    override fun observeAllUsers(): Flow<List<User>> =
+        userDao.observeAll().map { entities -> entities.map { it.toDomain() } }
+
     override fun observeUnsyncedCount(): Flow<Int> = userDao.observeUnsyncedCount()
 
     override suspend fun getCurrentUser(): User? = withContext(ioDispatcher) {
@@ -139,6 +142,56 @@ class AuthRepositoryImpl @Inject constructor(
                 }
             }
             Result.success(entity.toDomain())
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun setUserActiveStatus(
+        userId: String,
+        isActive: Boolean
+    ): Result<Unit> = withContext(ioDispatcher) {
+        try {
+            val cleanUserId = userId.trim()
+            if (cleanUserId.isBlank()) {
+                return@withContext Result.failure(
+                    IllegalArgumentException("User ID is required.")
+                )
+            }
+            val existing = userDao.getById(cleanUserId)
+                ?: return@withContext Result.failure(
+                    IllegalArgumentException("Staff account not found.")
+                )
+
+            val activeSessionId = syncPreferencesRepository.sessionUserId.first()
+            if (!isActive && activeSessionId == existing.id) {
+                return@withContext Result.failure(
+                    IllegalStateException("You cannot deactivate your own currently signed-in Admin account.")
+                )
+            }
+
+            val now = System.currentTimeMillis()
+            userDao.updateActiveStatus(
+                userId = existing.id,
+                isActive = isActive,
+                updatedAt = now
+            )
+
+            if (syncPreferencesRepository.isCloudSyncEnabled.first()) {
+                val updatedEntity = existing.copy(
+                    isActive = isActive,
+                    isSynced = false,
+                    updatedAt = now
+                )
+                if (firebaseAuthSyncDataSource.pushUserProfile(updatedEntity).isSuccess) {
+                    val syncedAt = System.currentTimeMillis()
+                    userDao.markSynced(existing.id, syncedAt)
+                    syncPreferencesRepository.updateLastSyncedAt(syncedAt)
+                }
+            }
+            Result.success(Unit)
         } catch (ce: CancellationException) {
             throw ce
         } catch (e: Exception) {

@@ -81,6 +81,8 @@ private class FakeAuthRepository : AuthRepository {
     private val currentUser = MutableStateFlow<User?>(null)
 
     override fun observeCurrentUser(): Flow<User?> = currentUser
+    override fun observeAllUsers(): Flow<List<User>> =
+        MutableStateFlow(listOfNotNull(currentUser.value))
     override fun observeUnsyncedCount(): Flow<Int> = MutableStateFlow(0)
     override suspend fun getCurrentUser(): User? = currentUser.value
 
@@ -107,6 +109,9 @@ private class FakeAuthRepository : AuthRepository {
         currentUser.value = user
         return Result.success(user)
     }
+
+    override suspend fun setUserActiveStatus(userId: String, isActive: Boolean): Result<Unit> =
+        Result.success(Unit)
 
     override suspend fun syncPendingUsers(): Result<Int> = Result.success(0)
 

@@ -10,6 +10,8 @@ object AeTranzitRoutes {
     const val ADMIN_DASHBOARD = "admin_dashboard"
     const val ADMIN_BUSES = "admin_buses"
     const val ADMIN_ROUTES = "admin_routes"
+    const val ADMIN_REPORTS = "admin_reports"
+    const val ADMIN_STAFF = "admin_staff"
 
     const val CONDUCTOR_HOME = "conductor_home"
     const val ARG_TRIP_ID = "tripId"

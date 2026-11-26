@@ -12,6 +12,9 @@ interface TicketDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(ticket: TicketEntity)
 
+    @Query("SELECT * FROM tickets ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<TicketEntity>>
+
     @Query("SELECT * FROM tickets WHERE tripId = :tripId ORDER BY createdAt DESC")
     fun observeByTrip(tripId: String): Flow<List<TicketEntity>>
 

@@ -34,6 +34,9 @@ class TicketRepositoryImpl @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : TicketRepository {
 
+    override fun observeAllTickets(): Flow<List<Ticket>> =
+        ticketDao.observeAll().map { list -> list.map { it.toDomain() } }
+
     override fun observeTicketById(ticketId: String): Flow<Ticket?> =
         ticketDao.observeById(ticketId.trim()).map { it?.toDomain() }
 

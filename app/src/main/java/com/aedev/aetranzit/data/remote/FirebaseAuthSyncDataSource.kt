@@ -31,7 +31,15 @@ class FirebaseAuthSyncDataSource @Inject constructor(
                 "isActive" to user.isActive,
                 "updatedAt" to user.updatedAt
             )
-            val docId = firebaseAuth.currentUser?.uid ?: user.id
+            val currentAuthUser = firebaseAuth.currentUser
+            val docId = if (
+                currentAuthUser != null &&
+                currentAuthUser.email.equals(user.email, ignoreCase = true)
+            ) {
+                currentAuthUser.uid
+            } else {
+                user.id
+            }
             firestore.collection(USERS_COLLECTION)
                 .document(docId)
                 .set(payload, SetOptions.merge())

@@ -4,6 +4,7 @@ import com.aedev.aetranzit.domain.model.Trip
 import kotlinx.coroutines.flow.Flow
 
 interface TripRepository {
+    fun observeAllTrips(): Flow<List<Trip>>
     fun observeTripById(tripId: String): Flow<Trip?>
     fun observeActiveTrip(conductorId: String): Flow<Trip?>
     fun observeTripsByConductor(conductorId: String): Flow<List<Trip>>

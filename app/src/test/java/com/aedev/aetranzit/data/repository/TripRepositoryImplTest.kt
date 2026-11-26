@@ -148,6 +148,8 @@ private class InMemoryTripDao : TripDao {
         items.value = items.value.filterNot { it.id == trip.id } + trip
     }
 
+    override fun observeAll(): Flow<List<TripEntity>> = items
+
     override fun observeByConductor(conductorId: String): Flow<List<TripEntity>> =
         items.map { list -> list.filter { it.conductorId == conductorId } }
 

@@ -203,6 +203,8 @@ private class FakeTicketDao : TicketDao {
         items.value = items.value.filterNot { it.id == ticket.id } + ticket
     }
 
+    override fun observeAll(): Flow<List<TicketEntity>> = items
+
     override fun observeByTrip(tripId: String): Flow<List<TicketEntity>> =
         items.map { list -> list.filter { it.tripId == tripId } }
 
@@ -256,6 +258,8 @@ private class FakeTripDaoForTickets : TripDao {
     override suspend fun upsert(trip: TripEntity) {
         items.value = items.value.filterNot { it.id == trip.id } + trip
     }
+
+    override fun observeAll(): Flow<List<TripEntity>> = items
 
     override fun observeByConductor(conductorId: String): Flow<List<TripEntity>> =
         items.map { list -> list.filter { it.conductorId == conductorId } }
