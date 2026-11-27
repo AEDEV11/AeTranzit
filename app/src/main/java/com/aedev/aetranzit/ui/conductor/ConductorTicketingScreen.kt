@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EventSeat
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Settings
@@ -46,7 +47,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -91,7 +91,9 @@ import com.aedev.aetranzit.domain.model.TicketStatus
 import com.aedev.aetranzit.domain.model.Trip
 import com.aedev.aetranzit.domain.model.TripStatus
 import com.aedev.aetranzit.domain.usecase.FareCalculationResult
+import com.aedev.aetranzit.ui.components.AeChipTone
 import com.aedev.aetranzit.ui.components.AeEmptyStateCard
+import com.aedev.aetranzit.ui.components.AeFilterChip
 import com.aedev.aetranzit.ui.components.AePrimaryButton
 import com.aedev.aetranzit.ui.components.SyncBadgeUiState
 import com.aedev.aetranzit.ui.components.SyncStatusBadge
@@ -157,7 +159,9 @@ fun ConductorTicketingScreen(
         ModalBottomSheet(
             onDismissRequest = { handleEvent(ConductorTicketingUiEvent.DismissIssueSheet) },
             sheetState = issueSheetState,
-            containerColor = MaterialTheme.colorScheme.surface
+            shape = MaterialTheme.shapes.extraLarge,
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = AeDimens.ZeroElevation
         ) {
             IssueTicketSheetContent(
                 seatNumber = uiState.selectedSeatForIssue.orEmpty(),
@@ -185,7 +189,9 @@ fun ConductorTicketingScreen(
         ModalBottomSheet(
             onDismissRequest = { handleEvent(ConductorTicketingUiEvent.DismissInspectedTicket) },
             sheetState = detailsSheetState,
-            containerColor = MaterialTheme.colorScheme.surface
+            shape = MaterialTheme.shapes.extraLarge,
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = AeDimens.ZeroElevation
         ) {
             OccupiedSeatDetailsSheetContent(
                 ticket = inspectedTicket,
@@ -1253,17 +1259,13 @@ fun IssueTicketSheetContent(
                 verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
             ) {
                 destinationOptions.forEach { option ->
-                    val isSelected = selectedDestination?.name == option.name
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { onEvent(ConductorTicketingUiEvent.SelectDestination(option)) },
-                        label = {
-                            Text(
-                                text = "${option.name} (${formatPhp(option.fare)})",
-                                style = TabularLabelStyle.merge(MaterialTheme.typography.labelLarge)
-                            )
-                        },
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                    AeFilterChip(
+                        label = "${option.name} (${formatPhp(option.fare)})",
+                        selected = selectedDestination?.name == option.name,
+                        tone = AeChipTone.PRIMARY_CONTAINER,
+                        showCheckWhenSelected = true,
+                        useTabularStyle = true,
+                        onClick = { onEvent(ConductorTicketingUiEvent.SelectDestination(option)) }
                     )
                 }
             }
@@ -1280,16 +1282,22 @@ fun IssueTicketSheetContent(
                 verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
             ) {
                 PassengerType.entries.forEach { type ->
-                    FilterChip(
+                    AeFilterChip(
+                        label = type.chipLabel,
                         selected = selectedPassengerType == type,
-                        onClick = { onEvent(ConductorTicketingUiEvent.SelectPassengerType(type)) },
-                        label = {
-                            Text(
-                                text = type.chipLabel,
-                                style = MaterialTheme.typography.labelLarge
-                            )
+                        tone = if (type.isDiscounted) {
+                            AeChipTone.DISCOUNT_TEAL
+                        } else {
+                            AeChipTone.PRIMARY
                         },
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                        leadingIcon = if (type.isDiscounted) {
+                            Icons.Default.LocalOffer
+                        } else {
+                            null
+                        },
+                        showCheckWhenSelected = !type.isDiscounted,
+                        useTabularStyle = type.isDiscounted,
+                        onClick = { onEvent(ConductorTicketingUiEvent.SelectPassengerType(type)) }
                     )
                 }
             }
@@ -1343,24 +1351,18 @@ fun IssueTicketSheetContent(
                         }
                     }
 
-                    FilterChip(
+                    AeFilterChip(
+                        label = "Override",
                         selected = isManualFareOverrideEnabled,
+                        tone = AeChipTone.PRIMARY,
+                        leadingIcon = Icons.Default.Edit,
                         onClick = {
                             onEvent(
                                 ConductorTicketingUiEvent.ToggleManualFareOverride(
                                     !isManualFareOverrideEnabled
                                 )
                             )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = null,
-                                modifier = Modifier.size(AeDimens.IconXs)
-                            )
-                        },
-                        label = { Text("Override") },
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                        }
                     )
                 }
 
@@ -1411,27 +1413,23 @@ fun IssueTicketSheetContent(
                 val isExactSelected = fareCalculation.cashTendered != null &&
                     fareCalculation.finalFare > 0.0 &&
                     fareCalculation.cashTendered == fareCalculation.finalFare
-                FilterChip(
+                AeFilterChip(
+                    label = "Exact",
                     selected = isExactSelected,
-                    onClick = { onEvent(ConductorTicketingUiEvent.SelectExactCash) },
-                    label = { Text("Exact", style = MaterialTheme.typography.labelLarge) },
-                    modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                    tone = AeChipTone.PRIMARY,
+                    showCheckWhenSelected = true,
+                    onClick = { onEvent(ConductorTicketingUiEvent.SelectExactCash) }
                 )
 
                 QUICK_CASH_DENOMINATIONS.forEach { bill ->
                     val isBillSelected = fareCalculation.cashTendered == bill
-                    FilterChip(
+                    AeFilterChip(
+                        label = "₱${bill.toInt()}",
                         selected = isBillSelected,
-                        onClick = { onEvent(ConductorTicketingUiEvent.SelectQuickCash(bill)) },
-                        label = {
-                            Text(
-                                text = "₱${bill.toInt()}",
-                                style = TabularAmountStyle.copy(
-                                    fontSize = MaterialTheme.typography.labelLarge.fontSize
-                                )
-                            )
-                        },
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                        tone = AeChipTone.PRIMARY_CONTAINER,
+                        showCheckWhenSelected = true,
+                        emphasizeTabularNumbers = true,
+                        onClick = { onEvent(ConductorTicketingUiEvent.SelectQuickCash(bill)) }
                     )
                 }
             }
@@ -1872,7 +1870,12 @@ private fun ConductorTicketing2x3Preview() {
     }
 }
 
-@Preview(showBackground = true, name = "Issue Ticket Sheet — Student 20% Discount")
+@Preview(showBackground = true, name = "Issue Ticket Sheet — Student 20% Discount Light")
+@Preview(
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    name = "Issue Ticket Sheet — Student 20% Discount Dark"
+)
 @Composable
 private fun IssueTicketSheetDiscountedPreview() {
     val options = listOf(

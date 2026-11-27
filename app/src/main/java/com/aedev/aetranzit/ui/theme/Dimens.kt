@@ -42,8 +42,16 @@ object AeDimens {
     val LinearBarHeight = 8.dp
     val FabBottomClearance = 88.dp
 
+    val ZeroElevation = 0.dp
     val CardElevation = 1.dp
     val ElevatedCardElevation = 3.dp
     val BorderWidth = 1.dp
     val BorderWidthThick = 2.dp
+
+    val DialogIconBadgeSize = 48.dp
+    val DialogMaxWidth = 420.dp
+    val DialogScrollMaxHeight = 420.dp
+    val ChipHorizontalPadding = 14.dp
+    val ChipVerticalPadding = 8.dp
+    val ChipIconSpacing = 6.dp
 }

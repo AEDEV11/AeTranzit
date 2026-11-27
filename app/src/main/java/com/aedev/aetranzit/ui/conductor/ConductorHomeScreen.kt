@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,7 +28,6 @@ import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.StopCircle
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -57,7 +57,10 @@ import com.aedev.aetranzit.domain.model.Route
 import com.aedev.aetranzit.domain.model.RouteStop
 import com.aedev.aetranzit.domain.model.Trip
 import com.aedev.aetranzit.domain.model.TripStatus
+import com.aedev.aetranzit.ui.components.AeDialogTone
 import com.aedev.aetranzit.ui.components.AeEmptyStateCard
+import com.aedev.aetranzit.ui.components.AeModalDialog
+import com.aedev.aetranzit.ui.components.AeModalDialogSurface
 import com.aedev.aetranzit.ui.components.AePrimaryButton
 import com.aedev.aetranzit.ui.components.SyncBadgeUiState
 import com.aedev.aetranzit.ui.components.SyncStatusBadge
@@ -204,30 +207,17 @@ fun ConductorHomeContent(
     if (uiState.isEndTripConfirmVisible && uiState.activeTripDetails != null) {
         val busLabel = uiState.activeTripDetails.bus?.busNumber?.let { "Bus $it" } ?: "current bus"
         val routeLabel = uiState.activeTripDetails.route?.displayName ?: "current route"
-        AlertDialog(
-            onDismissRequest = { onEvent(ConductorHomeUiEvent.DismissEndTripDialog) },
-            title = { Text("End Active Trip?") },
-            text = {
-                Text(
-                    "Mark $busLabel ($routeLabel) as COMPLETED? No new tickets can be issued for this trip once ended."
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { onEvent(ConductorHomeUiEvent.ConfirmEndTrip) },
-                    modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
-                ) {
-                    Text("End Trip", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { onEvent(ConductorHomeUiEvent.DismissEndTripDialog) },
-                    modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
-                ) {
-                    Text("Keep Active")
-                }
-            }
+        AeModalDialog(
+            title = "End Active Trip?",
+            subtitle = "Mark $busLabel ($routeLabel) as COMPLETED? No new tickets can be issued for this trip once ended.",
+            useTabularSubtitle = true,
+            confirmText = "End Trip",
+            dismissText = "Keep Active",
+            icon = Icons.Default.StopCircle,
+            tone = AeDialogTone.DESTRUCTIVE,
+            isConfirmLoading = uiState.isSubmitting,
+            onConfirm = { onEvent(ConductorHomeUiEvent.ConfirmEndTrip) },
+            onDismissRequest = { onEvent(ConductorHomeUiEvent.DismissEndTripDialog) }
         )
     }
 }
@@ -801,5 +791,32 @@ private fun ConductorHomeActiveTripPreview() {
             onOpenSettings = {},
             onLogout = {}
         )
+    }
+}
+
+@Preview(showBackground = true, name = "End Active Trip Dialog - Light")
+@Preview(
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    name = "End Active Trip Dialog - Dark"
+)
+@Composable
+private fun EndActiveTripDialogPreview() {
+    AeTranzitTheme {
+        Surface(color = MaterialTheme.colorScheme.background) {
+            Box(modifier = Modifier.padding(AeDimens.SpaceMd)) {
+                AeModalDialogSurface(
+                    title = "End Active Trip?",
+                    subtitle = "Mark Bus 101 (Cubao → Dau) as COMPLETED? No new tickets can be issued for this trip once ended.",
+                    useTabularSubtitle = true,
+                    confirmText = "End Trip",
+                    dismissText = "Keep Active",
+                    icon = Icons.Default.StopCircle,
+                    tone = AeDialogTone.DESTRUCTIVE,
+                    onConfirm = {},
+                    onDismiss = {}
+                )
+            }
+        }
     }
 }

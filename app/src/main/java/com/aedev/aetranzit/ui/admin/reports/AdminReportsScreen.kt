@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.TableView
@@ -32,7 +31,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,7 +53,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aedev.aetranzit.R
 import com.aedev.aetranzit.domain.usecase.AnalyticsDateRange
 import com.aedev.aetranzit.domain.usecase.ReportTicketRow
+import com.aedev.aetranzit.ui.components.AeChipTone
 import com.aedev.aetranzit.ui.components.AeEmptyStateCard
+import com.aedev.aetranzit.ui.components.AeFilterChip
 import com.aedev.aetranzit.ui.components.formatPhp
 import com.aedev.aetranzit.ui.theme.AeDimens
 import com.aedev.aetranzit.ui.theme.AeTranzitTheme
@@ -228,24 +228,12 @@ private fun ReportsFilterSection(
                 horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
             ) {
                 AnalyticsDateRange.entries.forEach { range ->
-                    val selected = range == uiState.selectedDateRange
-                    FilterChip(
-                        selected = selected,
-                        onClick = { onSelectDateRange(range) },
-                        shape = CircleShape,
-                        label = { Text(range.chipLabel) },
-                        leadingIcon = if (selected) {
-                            {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(AeDimens.IconXs)
-                                )
-                            }
-                        } else {
-                            null
-                        },
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                    AeFilterChip(
+                        label = range.chipLabel,
+                        selected = range == uiState.selectedDateRange,
+                        showCheckWhenSelected = true,
+                        useTabularStyle = true,
+                        onClick = { onSelectDateRange(range) }
                     )
                 }
             }
@@ -262,20 +250,21 @@ private fun ReportsFilterSection(
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
                 ) {
-                    FilterChip(
+                    AeFilterChip(
+                        label = "All Buses",
                         selected = uiState.selectedBusId == null,
-                        onClick = { onSelectBus(null) },
-                        shape = CircleShape,
-                        label = { Text("All Buses") },
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                        tone = AeChipTone.PRIMARY_CONTAINER,
+                        showCheckWhenSelected = true,
+                        onClick = { onSelectBus(null) }
                     )
                     uiState.busOptions.forEach { option ->
-                        FilterChip(
+                        AeFilterChip(
+                            label = option.label,
                             selected = uiState.selectedBusId == option.id,
-                            onClick = { onSelectBus(option.id) },
-                            shape = CircleShape,
-                            label = { Text(option.label) },
-                            modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                            tone = AeChipTone.PRIMARY_CONTAINER,
+                            showCheckWhenSelected = true,
+                            useTabularStyle = true,
+                            onClick = { onSelectBus(option.id) }
                         )
                     }
                 }
@@ -293,20 +282,20 @@ private fun ReportsFilterSection(
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
                 ) {
-                    FilterChip(
+                    AeFilterChip(
+                        label = "All Conductors",
                         selected = uiState.selectedConductorId == null,
-                        onClick = { onSelectConductor(null) },
-                        shape = CircleShape,
-                        label = { Text("All Conductors") },
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                        tone = AeChipTone.PRIMARY_CONTAINER,
+                        showCheckWhenSelected = true,
+                        onClick = { onSelectConductor(null) }
                     )
                     uiState.conductorOptions.forEach { option ->
-                        FilterChip(
+                        AeFilterChip(
+                            label = option.label,
                             selected = uiState.selectedConductorId == option.id,
-                            onClick = { onSelectConductor(option.id) },
-                            shape = CircleShape,
-                            label = { Text(option.label) },
-                            modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                            tone = AeChipTone.PRIMARY_CONTAINER,
+                            showCheckWhenSelected = true,
+                            onClick = { onSelectConductor(option.id) }
                         )
                     }
                 }

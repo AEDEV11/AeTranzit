@@ -68,6 +68,7 @@ import com.aedev.aetranzit.domain.usecase.AnalyticsDateRange
 import com.aedev.aetranzit.domain.usecase.ConductorPerformanceStat
 import com.aedev.aetranzit.domain.usecase.DailyRevenuePoint
 import com.aedev.aetranzit.domain.usecase.DestinationRevenueStat
+import com.aedev.aetranzit.ui.components.AeFilterChip
 import com.aedev.aetranzit.ui.components.SyncBadgeUiState
 import com.aedev.aetranzit.ui.components.SyncStatusBadge
 import com.aedev.aetranzit.ui.components.formatPhp
@@ -412,33 +413,13 @@ private fun DateRangeFilterBar(
         horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
     ) {
         AnalyticsDateRange.entries.forEach { range ->
-            val isSelected = range == selectedRange
-            Surface(
-                onClick = { onSelectRange(range) },
-                shape = CircleShape,
-                color = if (isSelected) ElectricBlue else MaterialTheme.colorScheme.surface,
-                contentColor = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface,
-                border = if (isSelected) {
-                    null
-                } else {
-                    BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
-                },
-                shadowElevation = if (isSelected) AeDimens.CardElevation else AeDimens.SpaceXxs / 2,
-                modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
-            ) {
-                Box(
-                    modifier = Modifier.padding(
-                        horizontal = AeDimens.SpaceMd,
-                        vertical = AeDimens.SpaceSm
-                    ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = range.chipLabel,
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                }
-            }
+            AeFilterChip(
+                label = range.chipLabel,
+                selected = range == selectedRange,
+                showCheckWhenSelected = true,
+                useTabularStyle = true,
+                onClick = { onSelectRange(range) }
+            )
         }
     }
 }

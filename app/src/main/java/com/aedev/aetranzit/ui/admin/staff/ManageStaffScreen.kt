@@ -41,9 +41,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -79,11 +76,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aedev.aetranzit.domain.model.UserRole
+import com.aedev.aetranzit.ui.components.AeDialogTone
+import com.aedev.aetranzit.ui.components.AeFilterChip
+import com.aedev.aetranzit.ui.components.AeModalDialog
+import com.aedev.aetranzit.ui.components.AeModalDialogSurface
 import com.aedev.aetranzit.ui.components.AePrimaryButton
 import com.aedev.aetranzit.ui.theme.AeDimens
 import com.aedev.aetranzit.ui.theme.AeTranzitTheme
 import com.aedev.aetranzit.ui.theme.DeepNavy
-import com.aedev.aetranzit.ui.theme.ElectricBlue
 import com.aedev.aetranzit.ui.theme.NavySubtleText
 import com.aedev.aetranzit.ui.theme.PureWhite
 import com.aedev.aetranzit.ui.theme.TabularAmountStyle
@@ -185,8 +185,8 @@ fun ManageStaffContent(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onOpenAddStaff,
-                containerColor = ElectricBlue,
-                contentColor = PureWhite,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = CircleShape,
                 icon = {
                     Icon(
@@ -278,7 +278,9 @@ fun ManageStaffContent(
     if (uiState.addStaffForm.isSheetVisible) {
         ModalBottomSheet(
             onDismissRequest = onDismissAddStaff,
-            containerColor = MaterialTheme.colorScheme.surface
+            shape = MaterialTheme.shapes.extraLarge,
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = AeDimens.ZeroElevation
         ) {
             AddStaffSheetContent(
                 formState = uiState.addStaffForm,
@@ -509,53 +511,17 @@ private fun StaffRoleChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val containerColor = if (selected) {
-        ElectricBlue
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    val contentColor = if (selected) {
-        PureWhite
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val border = if (selected) {
-        null
-    } else {
-        BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
-    }
-
-    Surface(
+    AeFilterChip(
+        label = role.displayName,
+        selected = selected,
+        leadingIcon = if (role == UserRole.ADMIN) {
+            Icons.Default.AdminPanelSettings
+        } else {
+            Icons.Default.Badge
+        },
         onClick = onClick,
-        shape = CircleShape,
-        color = containerColor,
-        contentColor = contentColor,
-        border = border,
-        modifier = modifier.heightIn(min = AeDimens.MinTouchTarget)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = AeDimens.SpaceMd, vertical = AeDimens.SpaceSm),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = if (role == UserRole.ADMIN) {
-                    Icons.Default.AdminPanelSettings
-                } else {
-                    Icons.Default.Badge
-                },
-                contentDescription = null,
-                modifier = Modifier.size(AeDimens.IconSm)
-            )
-            Spacer(modifier = Modifier.width(AeDimens.SpaceSm))
-            Text(
-                text = role.displayName,
-                style = MaterialTheme.typography.labelLarge
-            )
-        }
-    }
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -564,83 +530,47 @@ private fun ProvisionedCredentialsDialog(
     onCopyCredentials: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary
-            )
-        },
-        title = {
-            Text(
-                text = "Staff Account Created",
-                style = MaterialTheme.typography.titleLarge
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)) {
-                Text(
-                    text = "Share these credentials with ${credentials.name}. They will be required to change this temporary password on first sign-in.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+    AeModalDialog(
+        title = "Staff Account Created",
+        subtitle = "Share these credentials with ${credentials.name}. They must change this temporary password on first sign-in.",
+        confirmText = "Copy",
+        dismissText = "Done",
+        icon = Icons.Default.CheckCircle,
+        tone = AeDialogTone.POSITIVE,
+        confirmLeadingIcon = Icons.Default.ContentCopy,
+        onConfirm = onCopyCredentials,
+        onDismissRequest = onDismiss
+    ) {
+        ProvisionedCredentialsCard(credentials = credentials)
+    }
+}
 
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    border = BorderStroke(
-                        AeDimens.BorderWidth,
-                        MaterialTheme.colorScheme.outlineVariant
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(AeDimens.SpaceMd),
-                        verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
-                    ) {
-                        CredentialLine(label = "Role", value = credentials.role.displayName)
-                        CredentialLine(label = "Email", value = credentials.email)
-                        CredentialLine(
-                            label = "Temporary Password",
-                            value = credentials.temporaryPassword,
-                            isMonospaceHighlight = true
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onCopyCredentials,
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = ElectricBlue,
-                    contentColor = PureWhite
-                ),
-                modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ContentCopy,
-                    contentDescription = null,
-                    modifier = Modifier.size(AeDimens.IconXs)
-                )
-                Spacer(modifier = Modifier.width(AeDimens.SpaceXs))
-                Text("Copy Credentials")
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
-            ) {
-                Text("Done")
-            }
+@Composable
+private fun ProvisionedCredentialsCard(credentials: ProvisionedStaffCredentials) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(
+            AeDimens.BorderWidth,
+            MaterialTheme.colorScheme.outlineVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AeDimens.SpaceMd),
+            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
+        ) {
+            CredentialLine(label = "Role", value = credentials.role.displayName)
+            CredentialLine(label = "Email", value = credentials.email)
+            CredentialLine(
+                label = "Temporary Password",
+                value = credentials.temporaryPassword,
+                isMonospaceHighlight = true
+            )
         }
-    )
+    }
 }
 
 @Composable
@@ -1061,5 +991,74 @@ private fun ManageStaffContentPreview() {
             onToggleUserActive = { _, _ -> },
             onDismissMessage = {}
         )
+    }
+}
+
+@Preview(showBackground = true, name = "Provisioned Staff Credentials Dialog - Light")
+@Preview(
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    name = "Provisioned Staff Credentials Dialog - Dark"
+)
+@Composable
+private fun ProvisionedCredentialsDialogPreview() {
+    val sampleCredentials = ProvisionedStaffCredentials(
+        name = "Ramon Magsaysay",
+        email = "ramon@victoryliner.ph",
+        role = UserRole.CONDUCTOR,
+        temporaryPassword = "AET-84219",
+        companyName = "Victory Liner"
+    )
+    AeTranzitTheme {
+        Surface(color = MaterialTheme.colorScheme.background) {
+            Box(modifier = Modifier.padding(AeDimens.SpaceMd)) {
+                AeModalDialogSurface(
+                    title = "Staff Account Created",
+                    subtitle = "Share these credentials with ${sampleCredentials.name}. They must change this temporary password on first sign-in.",
+                    confirmText = "Copy",
+                    dismissText = "Done",
+                    icon = Icons.Default.CheckCircle,
+                    tone = AeDialogTone.POSITIVE,
+                    confirmLeadingIcon = Icons.Default.ContentCopy,
+                    onConfirm = {},
+                    onDismiss = {}
+                ) {
+                    ProvisionedCredentialsCard(credentials = sampleCredentials)
+                }
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Add Staff Sheet - Light")
+@Preview(
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    name = "Add Staff Sheet - Dark"
+)
+@Composable
+private fun AddStaffSheetPreview() {
+    AeTranzitTheme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            AddStaffSheetContent(
+                formState = AddStaffFormState(
+                    isSheetVisible = true,
+                    selectedRole = UserRole.CONDUCTOR,
+                    name = "Ramon Magsaysay",
+                    email = "ramon@victoryliner.ph",
+                    temporaryPassword = "AET-84219",
+                    isPasswordVisible = true
+                ),
+                companyName = "Victory Liner",
+                onNameChanged = {},
+                onEmailChanged = {},
+                onRoleSelected = {},
+                onTempPasswordChanged = {},
+                onGenerateTempPassword = {},
+                onToggleTempPasswordVisibility = {},
+                onSubmit = {},
+                onCancel = {}
+            )
+        }
     }
 }
