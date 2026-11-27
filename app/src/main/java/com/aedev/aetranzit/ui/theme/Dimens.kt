@@ -8,7 +8,6 @@ object AeDimens {
     val SpaceSm = 8.dp
     val SpaceSmPlus = 12.dp
     val SpaceMd = 16.dp
-    val SpaceMdPlus = 20.dp
     val SpaceLg = 24.dp
     val SpaceXl = 32.dp
 

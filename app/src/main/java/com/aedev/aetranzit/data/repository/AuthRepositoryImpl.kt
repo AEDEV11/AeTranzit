@@ -532,37 +532,6 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun syncPendingUsers(): Result<Int> = withContext(ioDispatcher) {
-        try {
-            if (!syncPreferencesRepository.isCloudSyncEnabled.first()) {
-                return@withContext Result.failure(
-                    IllegalStateException("Enable Cloud Sync in Settings before syncing.")
-                )
-            }
-            val companyId = activeCompanyProvider.getActiveCompanyId()
-                ?: return@withContext Result.success(0)
-
-            val unsynced = userDao.getUnsyncedByCompany(companyId)
-            var syncedCount = 0
-            for (user in unsynced) {
-                val result = authSyncDataSource.pushUserProfile(user)
-                if (result.isSuccess) {
-                    val syncedAt = System.currentTimeMillis()
-                    userDao.markSynced(user.id, syncedAt)
-                    syncedCount++
-                }
-            }
-            if (syncedCount > 0 || unsynced.isEmpty()) {
-                syncPreferencesRepository.updateLastSyncedAt(System.currentTimeMillis())
-            }
-            Result.success(syncedCount)
-        } catch (ce: CancellationException) {
-            throw ce
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
     override suspend fun logout() {
         withContext(ioDispatcher) {
             syncPreferencesRepository.setSessionUserId(null)

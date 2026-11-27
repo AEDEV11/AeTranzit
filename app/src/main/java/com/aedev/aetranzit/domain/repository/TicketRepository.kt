@@ -19,5 +19,4 @@ interface TicketRepository {
         cashTendered: Double
     ): Result<Ticket>
     suspend fun markPassengerDroppedOff(ticketId: String): Result<Ticket>
-    suspend fun syncPendingTickets(): Result<Int>
 }

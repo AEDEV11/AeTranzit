@@ -16,16 +16,3 @@ fun TripEntity.toDomain(): Trip = Trip(
     isSynced = isSynced,
     updatedAt = updatedAt
 )
-
-fun Trip.toEntity(): TripEntity = TripEntity(
-    id = id,
-    busId = busId,
-    routeId = routeId,
-    conductorId = conductorId,
-    companyId = companyId,
-    status = status.name,
-    startedAt = startedAt,
-    endedAt = endedAt,
-    isSynced = isSynced,
-    updatedAt = updatedAt
-)

@@ -53,10 +53,10 @@
 - [x] **Phase 6: Security Rules, Edge-Case QA & Verification**
 - [x] **Phase 7: Multi-Company (Multi-Tenant) Architecture Upgrade**
 - [x] **Phase 8: Multi-Tenant Auto-Sync (Firebase Cloud SSOT + Seamless Offline Room Queue)**
-- [x] **Phase 9: Admin-Only Registration, Separate Company Setup & Admin-Provisioned Staff with Forced Password Change**
+- [x] **Phase 10: Codebase Cleanup Pass & 4-Slide Onboarding Screen** — Removed obsolete methods/classes, added DataStore `hasCompletedOnboarding`, built `OnboardingViewModel` & 4-slide `OnboardingScreen` using `.webp` assets, wired routing in `SplashViewModel` & `AeTranzitNavHost`, and added unit tests. All 70 unit tests passing.
 
 ## Active Task
-- None — Phases 0–9 complete and verified. Ready for device testing and `firebase deploy --only firestore:rules`.
+- None — Codebase cleanup and 4-Slide Onboarding Screen complete and verified. Ready for device deployment or further instructions.
 
 ## Known Bugs / Open Questions
 - None blocking.

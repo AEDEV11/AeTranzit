@@ -7,9 +7,7 @@ interface TripRepository {
     fun observeAllTrips(): Flow<List<Trip>>
     fun observeTripById(tripId: String): Flow<Trip?>
     fun observeActiveTrip(conductorId: String): Flow<Trip?>
-    fun observeTripsByConductor(conductorId: String): Flow<List<Trip>>
     fun observeUnsyncedCount(): Flow<Int>
     suspend fun startTrip(conductorId: String, busId: String, routeId: String): Result<Trip>
     suspend fun endTrip(tripId: String): Result<Trip>
-    suspend fun syncPendingTrips(): Result<Int>
 }

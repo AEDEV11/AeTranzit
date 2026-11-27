@@ -15,16 +15,3 @@ fun UserEntity.toDomain(): User = User(
     isSynced = isSynced,
     updatedAt = updatedAt
 )
-
-fun User.toEntity(passwordHash: String): UserEntity = UserEntity(
-    id = id,
-    name = name,
-    email = email,
-    passwordHash = passwordHash,
-    role = role.name,
-    companyId = companyId,
-    isActive = isActive,
-    mustChangePassword = mustChangePassword,
-    isSynced = isSynced,
-    updatedAt = updatedAt
-)

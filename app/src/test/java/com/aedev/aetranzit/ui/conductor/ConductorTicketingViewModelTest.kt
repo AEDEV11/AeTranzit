@@ -180,9 +180,6 @@ private class FakeTripRepo : TripRepository {
 
     override fun observeActiveTrip(conductorId: String): Flow<Trip?> = trip
 
-    override fun observeTripsByConductor(conductorId: String): Flow<List<Trip>> =
-        trip.map { listOfNotNull(it) }
-
     override fun observeUnsyncedCount(): Flow<Int> = MutableStateFlow(0)
 
     override suspend fun startTrip(conductorId: String, busId: String, routeId: String): Result<Trip> =
@@ -190,8 +187,6 @@ private class FakeTripRepo : TripRepository {
 
     override suspend fun endTrip(tripId: String): Result<Trip> =
         Result.success(trip.value!!)
-
-    override suspend fun syncPendingTrips(): Result<Int> = Result.success(0)
 }
 
 private class FakeBusRepo : BusRepository {
@@ -217,7 +212,6 @@ private class FakeBusRepo : BusRepository {
         columns: Int
     ): Result<Bus> = Result.success(bus)
     override suspend fun deleteBus(id: String): Result<Unit> = Result.success(Unit)
-    override suspend fun syncPendingBuses(): Result<Int> = Result.success(0)
 }
 
 private class FakeRouteRepo : RouteRepository {
@@ -246,7 +240,6 @@ private class FakeRouteRepo : RouteRepository {
         stops: List<RouteStop>
     ): Result<Route> = Result.success(route)
     override suspend fun deleteRoute(id: String): Result<Unit> = Result.success(Unit)
-    override suspend fun syncPendingRoutes(): Result<Int> = Result.success(0)
 }
 
 private class FakeTicketRepo : TicketRepository {
@@ -309,6 +302,4 @@ private class FakeTicketRepo : TicketRepository {
         tickets.value = tickets.value.map { if (it.id == ticketId) updated else it }
         return Result.success(updated)
     }
-
-    override suspend fun syncPendingTickets(): Result<Int> = Result.success(0)
 }

@@ -27,9 +27,6 @@ interface CompanyDao {
     @Query("SELECT * FROM companies WHERE id = :companyId AND isSynced = 0")
     suspend fun getUnsyncedByCompany(companyId: String): List<CompanyEntity>
 
-    @Query("SELECT * FROM companies WHERE isSynced = 0")
-    suspend fun getUnsynced(): List<CompanyEntity>
-
     @Query("UPDATE companies SET isSynced = 1, updatedAt = :syncedAt WHERE id = :id")
     suspend fun markSynced(id: String, syncedAt: Long)
 

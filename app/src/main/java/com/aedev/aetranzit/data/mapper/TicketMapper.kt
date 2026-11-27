@@ -22,21 +22,3 @@ fun TicketEntity.toDomain(): Ticket = Ticket(
     isSynced = isSynced,
     updatedAt = updatedAt
 )
-
-fun Ticket.toEntity(): TicketEntity = TicketEntity(
-    id = id,
-    tripId = tripId,
-    busId = busId,
-    conductorId = conductorId,
-    companyId = companyId,
-    seatNumber = seatNumber,
-    destination = destination,
-    passengerType = passengerType.name,
-    fareAmount = fareAmount,
-    cashTendered = cashTendered,
-    changeAmount = changeAmount,
-    status = status.name,
-    createdAt = createdAt,
-    isSynced = isSynced,
-    updatedAt = updatedAt
-)

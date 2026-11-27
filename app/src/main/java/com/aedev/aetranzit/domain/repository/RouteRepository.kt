@@ -16,5 +16,4 @@ interface RouteRepository {
         stops: List<RouteStop>
     ): Result<Route>
     suspend fun deleteRoute(id: String): Result<Unit>
-    suspend fun syncPendingRoutes(): Result<Int>
 }

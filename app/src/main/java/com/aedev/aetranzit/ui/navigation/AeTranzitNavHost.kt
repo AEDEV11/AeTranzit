@@ -24,6 +24,7 @@ import com.aedev.aetranzit.ui.auth.ForceChangePasswordScreen
 import com.aedev.aetranzit.ui.auth.LoginScreen
 import com.aedev.aetranzit.ui.auth.RegisterScreen
 import com.aedev.aetranzit.ui.auth.SplashScreen
+import com.aedev.aetranzit.ui.onboarding.OnboardingScreen
 import com.aedev.aetranzit.ui.conductor.ConductorHomeScreen
 import com.aedev.aetranzit.ui.conductor.ConductorTicketingScreen
 import com.aedev.aetranzit.ui.conductor.ticket.DigitalTicketScreen
@@ -60,7 +61,19 @@ fun AeTranzitNavHost(
         composable(AeTranzitRoutes.SPLASH) {
             SplashScreen(
                 onNavigateToLogin = navigateToLoginReset,
+                onNavigateToOnboarding = {
+                    navController.navigate(AeTranzitRoutes.ONBOARDING) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
                 onAuthenticated = navigateToPostAuth
+            )
+        }
+
+        composable(AeTranzitRoutes.ONBOARDING) {
+            OnboardingScreen(
+                onOnboardingCompleted = navigateToLoginReset
             )
         }
 
@@ -108,7 +121,7 @@ fun AeTranzitNavHost(
         composable(AeTranzitRoutes.FORCE_CHANGE_PASSWORD) {
             val currentUser = sessionState.currentUser
             if (currentUser != null && !currentUser.mustChangePassword) {
-                LaunchedEffect(currentUser.id, currentUser.mustChangePassword) {
+                LaunchedEffect(currentUser.id) {
                     navigateToPostAuth(currentUser)
                 }
                 return@composable

@@ -5,6 +5,7 @@ import com.aedev.aetranzit.domain.model.UserRole
 
 object AeTranzitRoutes {
     const val SPLASH = "splash"
+    const val ONBOARDING = "onboarding"
     const val LOGIN = "login"
     const val REGISTER = "register"
     const val COMPANY_SETUP = "company_setup"

@@ -379,9 +379,6 @@ private class InMemoryCompanyDao : CompanyDao {
     override suspend fun getUnsyncedByCompany(companyId: String): List<CompanyEntity> =
         companies.value.filter { it.id == companyId && !it.isSynced }
 
-    override suspend fun getUnsynced(): List<CompanyEntity> =
-        companies.value.filter { !it.isSynced }
-
     override suspend fun markSynced(id: String, syncedAt: Long) {
         companies.value = companies.value.map {
             if (it.id == id) it.copy(isSynced = true, updatedAt = syncedAt) else it
@@ -396,10 +393,12 @@ private class FakeAuthSyncPrefs : SyncPreferencesRepository {
     private val enabled = MutableStateFlow(false)
     private val lastSynced = MutableStateFlow<Long?>(null)
     private val sessionUser = MutableStateFlow<String?>(null)
+    private val onboardingCompleted = MutableStateFlow(false)
 
     override val isCloudSyncEnabled: Flow<Boolean> = enabled
     override val lastSyncedAt: Flow<Long?> = lastSynced
     override val sessionUserId: Flow<String?> = sessionUser
+    override val hasCompletedOnboarding: Flow<Boolean> = onboardingCompleted
 
     override suspend fun setCloudSyncEnabled(enabled: Boolean) {
         this.enabled.value = enabled
@@ -411,6 +410,10 @@ private class FakeAuthSyncPrefs : SyncPreferencesRepository {
 
     override suspend fun setSessionUserId(userId: String?) {
         sessionUser.value = userId
+    }
+
+    override suspend fun setOnboardingCompleted(completed: Boolean) {
+        onboardingCompleted.value = completed
     }
 }
 

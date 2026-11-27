@@ -25,6 +25,7 @@ import com.aedev.aetranzit.ui.theme.AeTranzitTheme
 @Composable
 fun SplashScreen(
     onNavigateToLogin: () -> Unit,
+    onNavigateToOnboarding: () -> Unit,
     onAuthenticated: (User) -> Unit,
     viewModel: SplashViewModel = hiltViewModel()
 ) {
@@ -33,6 +34,7 @@ fun SplashScreen(
     LaunchedEffect(destination) {
         when (val current = destination) {
             SplashDestination.Loading -> Unit
+            SplashDestination.Onboarding -> onNavigateToOnboarding()
             SplashDestination.Login -> onNavigateToLogin()
             is SplashDestination.Authenticated -> onAuthenticated(current.user)
         }

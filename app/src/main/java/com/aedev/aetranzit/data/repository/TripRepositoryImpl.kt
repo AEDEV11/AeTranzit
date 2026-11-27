@@ -71,18 +71,6 @@ class TripRepositoryImpl @Inject constructor(
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    override fun observeTripsByConductor(conductorId: String): Flow<List<Trip>> =
-        activeCompanyProvider.observeActiveCompanyId().flatMapLatest { companyId ->
-            if (companyId.isNullOrBlank()) {
-                flowOf(emptyList())
-            } else {
-                tripDao.observeByConductor(conductorId, companyId).map { list ->
-                    list.map { it.toDomain() }
-                }
-            }
-        }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeUnsyncedCount(): Flow<Int> =
         activeCompanyProvider.observeActiveCompanyId().flatMapLatest { companyId ->
             if (companyId.isNullOrBlank()) {
@@ -192,36 +180,6 @@ class TripRepositoryImpl @Inject constructor(
                 syncScheduler.enqueueImmediateSync()
             }
             Result.success(updated.toDomain())
-        } catch (ce: CancellationException) {
-            throw ce
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun syncPendingTrips(): Result<Int> = withContext(ioDispatcher) {
-        try {
-            if (!syncPreferencesRepository.isCloudSyncEnabled.first()) {
-                return@withContext Result.failure(
-                    IllegalStateException("Enable Cloud Sync in Settings before syncing.")
-                )
-            }
-            val companyId = activeCompanyProvider.getActiveCompanyId()
-                ?: return@withContext Result.success(0)
-
-            val unsynced = tripDao.getUnsyncedByCompany(companyId)
-            var syncedCount = 0
-            for (trip in unsynced) {
-                if (fleetSyncDataSource.pushTrip(trip).isSuccess) {
-                    val syncedAt = System.currentTimeMillis()
-                    tripDao.markSynced(trip.id, syncedAt)
-                    syncedCount++
-                }
-            }
-            if (syncedCount > 0) {
-                syncPreferencesRepository.updateLastSyncedAt(System.currentTimeMillis())
-            }
-            Result.success(syncedCount)
         } catch (ce: CancellationException) {
             throw ce
         } catch (e: Exception) {

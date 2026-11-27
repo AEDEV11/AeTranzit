@@ -33,11 +33,7 @@ class TicketPayloadFormatterTest {
 
     @Test
     fun `buildQrPayload returns direct web verification URL for ticket id`() {
-        val payload = formatter.buildQrPayload(
-            ticket = sampleTicket,
-            busNumber = "AE-108",
-            routeLabel = "Cubao → Baguio"
-        )
+        val payload = formatter.buildQrPayload(ticket = sampleTicket)
 
         assertTrue(TicketPayloadFormatter.WEB_TICKET_BASE_URL.startsWith("https://"))
         assertTrue(TicketPayloadFormatter.WEB_TICKET_BASE_URL.endsWith("/t/"))

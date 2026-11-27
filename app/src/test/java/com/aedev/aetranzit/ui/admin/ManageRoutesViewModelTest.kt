@@ -130,6 +130,4 @@ private class FakeRouteRepository : RouteRepository {
         routes.value = routes.value.filterNot { it.id == id }
         return Result.success(Unit)
     }
-
-    override suspend fun syncPendingRoutes(): Result<Int> = Result.success(0)
 }

@@ -15,5 +15,4 @@ interface BusRepository {
         columns: Int
     ): Result<Bus>
     suspend fun deleteBus(id: String): Result<Unit>
-    suspend fun syncPendingBuses(): Result<Int>
 }

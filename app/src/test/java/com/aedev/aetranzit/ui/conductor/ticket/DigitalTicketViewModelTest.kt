@@ -227,12 +227,6 @@ class DigitalTicketViewModelTest {
         override fun observeCompanyById(companyId: String): Flow<Company?> =
             MutableStateFlow(company.takeIf { it.id == companyId })
         override fun observeUnsyncedCount(): Flow<Int> = MutableStateFlow(0)
-        override suspend fun getActiveCompany(): Company = company
-        override suspend fun getCompanyById(companyId: String): Company? =
-            company.takeIf { it.id == companyId }
-        override suspend fun findByJoinCode(joinCode: String): Result<Company?> =
-            Result.success(company.takeIf { it.joinCode == joinCode })
-        override suspend fun syncPendingCompanies(): Result<Int> = Result.success(0)
     }
 
     private class FakeDigitalTicketRepo : TicketRepository {
@@ -306,8 +300,6 @@ class DigitalTicketViewModelTest {
             tickets.value = tickets.value.map { if (it.id == ticketId) updated else it }
             return Result.success(updated)
         }
-
-        override suspend fun syncPendingTickets(): Result<Int> = Result.success(0)
     }
 
     private class FakeDigitalTripRepo : TripRepository {
@@ -330,13 +322,10 @@ class DigitalTicketViewModelTest {
             MutableStateFlow(trip.takeIf { it.id == tripId })
 
         override fun observeActiveTrip(conductorId: String): Flow<Trip?> = MutableStateFlow(trip)
-        override fun observeTripsByConductor(conductorId: String): Flow<List<Trip>> =
-            MutableStateFlow(listOf(trip))
         override fun observeUnsyncedCount(): Flow<Int> = MutableStateFlow(0)
         override suspend fun startTrip(conductorId: String, busId: String, routeId: String) =
             Result.success(trip)
         override suspend fun endTrip(tripId: String) = Result.success(trip)
-        override suspend fun syncPendingTrips(): Result<Int> = Result.success(0)
     }
 
     private class FakeDigitalBusRepo : BusRepository {
@@ -363,7 +352,6 @@ class DigitalTicketViewModelTest {
             columns: Int
         ) = Result.success(bus)
         override suspend fun deleteBus(id: String) = Result.success(Unit)
-        override suspend fun syncPendingBuses(): Result<Int> = Result.success(0)
     }
 
     private class FakeDigitalRouteRepo : RouteRepository {
@@ -390,7 +378,6 @@ class DigitalTicketViewModelTest {
             stops: List<RouteStop>
         ) = Result.success(route)
         override suspend fun deleteRoute(id: String) = Result.success(Unit)
-        override suspend fun syncPendingRoutes(): Result<Int> = Result.success(0)
     }
 
     private class FakeDigitalAuthRepo : AuthRepository {
@@ -426,7 +413,6 @@ class DigitalTicketViewModelTest {
             Result.success(conductor)
         override suspend fun setUserActiveStatus(userId: String, isActive: Boolean) =
             Result.success(Unit)
-        override suspend fun syncPendingUsers(): Result<Int> = Result.success(0)
         override suspend fun logout() = Unit
     }
 }

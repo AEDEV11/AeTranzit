@@ -381,14 +381,6 @@ private class FakeTripDaoForTickets : TripDao {
     override fun observeByCompany(companyId: String): Flow<List<TripEntity>> =
         items.map { list -> list.filter { it.companyId == companyId } }
 
-    override fun observeByConductor(
-        conductorId: String,
-        companyId: String
-    ): Flow<List<TripEntity>> =
-        items.map { list ->
-            list.filter { it.conductorId == conductorId && it.companyId == companyId }
-        }
-
     override fun observeActiveTripByConductor(
         conductorId: String,
         companyId: String
@@ -444,10 +436,12 @@ private class FakeTicketSyncPrefs : SyncPreferencesRepository {
     private val enabled = MutableStateFlow(false)
     private val lastSynced = MutableStateFlow<Long?>(null)
     private val sessionUser = MutableStateFlow<String?>(null)
+    private val onboardingCompleted = MutableStateFlow(false)
 
     override val isCloudSyncEnabled: Flow<Boolean> = enabled
     override val lastSyncedAt: Flow<Long?> = lastSynced
     override val sessionUserId: Flow<String?> = sessionUser
+    override val hasCompletedOnboarding: Flow<Boolean> = onboardingCompleted
 
     override suspend fun setCloudSyncEnabled(enabled: Boolean) {
         this.enabled.value = enabled
@@ -460,14 +454,16 @@ private class FakeTicketSyncPrefs : SyncPreferencesRepository {
     override suspend fun setSessionUserId(userId: String?) {
         sessionUser.value = userId
     }
+
+    override suspend fun setOnboardingCompleted(completed: Boolean) {
+        onboardingCompleted.value = completed
+    }
 }
 
 private class RecordingFleetSyncDataSource : FleetSyncRemoteDataSource {
     var lastOccupiedSeats: List<String> = emptyList()
 
     override suspend fun pushCompany(company: CompanyEntity): Result<Unit> = Result.success(Unit)
-    override suspend fun fetchCompanyByJoinCode(joinCode: String): Result<CompanyEntity?> =
-        Result.success(null)
     override suspend fun fetchCompanyById(companyId: String): Result<CompanyEntity?> =
         Result.success(null)
     override suspend fun fetchUsersByCompany(companyId: String): Result<List<UserEntity>> =

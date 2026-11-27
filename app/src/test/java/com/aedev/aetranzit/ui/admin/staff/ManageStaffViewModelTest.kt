@@ -132,12 +132,6 @@ private class FakeStaffCompanyRepository : CompanyRepository {
     override fun observeCompanyById(companyId: String): Flow<Company?> =
         MutableStateFlow(company.takeIf { it.id == companyId })
     override fun observeUnsyncedCount(): Flow<Int> = MutableStateFlow(0)
-    override suspend fun getActiveCompany(): Company? = activeFlow.value
-    override suspend fun getCompanyById(companyId: String): Company? =
-        company.takeIf { it.id == companyId }
-    override suspend fun findByJoinCode(joinCode: String): Result<Company?> =
-        Result.success(company.takeIf { it.joinCode == joinCode })
-    override suspend fun syncPendingCompanies(): Result<Int> = Result.success(0)
 }
 
 private class FakeStaffAuthRepository : AuthRepository {
@@ -227,8 +221,6 @@ private class FakeStaffAuthRepository : AuthRepository {
         }
         return Result.success(Unit)
     }
-
-    override suspend fun syncPendingUsers(): Result<Int> = Result.success(0)
 
     override suspend fun logout() {
         currentUserFlow.value = null

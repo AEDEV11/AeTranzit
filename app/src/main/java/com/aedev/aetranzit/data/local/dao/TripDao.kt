@@ -17,12 +17,6 @@ interface TripDao {
 
     @Query(
         "SELECT * FROM trips WHERE conductorId = :conductorId AND companyId = :companyId " +
-            "ORDER BY startedAt DESC"
-    )
-    fun observeByConductor(conductorId: String, companyId: String): Flow<List<TripEntity>>
-
-    @Query(
-        "SELECT * FROM trips WHERE conductorId = :conductorId AND companyId = :companyId " +
             "AND status = 'ACTIVE' ORDER BY startedAt DESC LIMIT 1"
     )
     fun observeActiveTripByConductor(conductorId: String, companyId: String): Flow<TripEntity?>

@@ -4,22 +4,26 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aedev.aetranzit.domain.model.User
 import com.aedev.aetranzit.domain.repository.AuthRepository
+import com.aedev.aetranzit.domain.repository.SyncPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 sealed interface SplashDestination {
     data object Loading : SplashDestination
+    data object Onboarding : SplashDestination
     data object Login : SplashDestination
     data class Authenticated(val user: User) : SplashDestination
 }
 
 @HiltViewModel
 class SplashViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val syncPreferencesRepository: SyncPreferencesRepository
 ) : ViewModel() {
 
     private val _destination = MutableStateFlow<SplashDestination>(SplashDestination.Loading)
@@ -32,10 +36,15 @@ class SplashViewModel @Inject constructor(
     private fun resolveSession() {
         viewModelScope.launch {
             val user = authRepository.getCurrentUser()
-            _destination.value = if (user == null) {
-                SplashDestination.Login
+            if (user != null) {
+                _destination.value = SplashDestination.Authenticated(user)
             } else {
-                SplashDestination.Authenticated(user)
+                val hasCompletedOnboarding = syncPreferencesRepository.hasCompletedOnboarding.first()
+                _destination.value = if (hasCompletedOnboarding) {
+                    SplashDestination.Login
+                } else {
+                    SplashDestination.Onboarding
+                }
             }
         }
     }

@@ -191,8 +191,6 @@ private class TenantTripDao : TripDao {
     }
     override fun observeByCompany(companyId: String): Flow<List<TripEntity>> =
         items.map { list -> list.filter { it.companyId == companyId } }
-    override fun observeByConductor(conductorId: String, companyId: String): Flow<List<TripEntity>> =
-        items.map { list -> list.filter { it.conductorId == conductorId && it.companyId == companyId } }
     override fun observeActiveTripByConductor(conductorId: String, companyId: String): Flow<TripEntity?> =
         items.map { list ->
             list.firstOrNull { it.conductorId == conductorId && it.companyId == companyId && it.status == "ACTIVE" }
@@ -216,15 +214,15 @@ private class TenantSyncPrefs : SyncPreferencesRepository {
     override val isCloudSyncEnabled: Flow<Boolean> = MutableStateFlow(false)
     override val lastSyncedAt: Flow<Long?> = MutableStateFlow(null)
     override val sessionUserId: Flow<String?> = MutableStateFlow(null)
+    override val hasCompletedOnboarding: Flow<Boolean> = MutableStateFlow(false)
     override suspend fun setCloudSyncEnabled(enabled: Boolean) = Unit
     override suspend fun updateLastSyncedAt(timestamp: Long) = Unit
     override suspend fun setSessionUserId(userId: String?) = Unit
+    override suspend fun setOnboardingCompleted(completed: Boolean) = Unit
 }
 
 private class NoOpFleetSyncDataSource : FleetSyncRemoteDataSource {
     override suspend fun pushCompany(company: CompanyEntity): Result<Unit> = Result.success(Unit)
-    override suspend fun fetchCompanyByJoinCode(joinCode: String): Result<CompanyEntity?> =
-        Result.success(null)
     override suspend fun fetchCompanyById(companyId: String): Result<CompanyEntity?> =
         Result.success(null)
     override suspend fun fetchUsersByCompany(companyId: String): Result<List<UserEntity>> =

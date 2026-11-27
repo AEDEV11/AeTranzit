@@ -11,12 +11,3 @@ fun CompanyEntity.toDomain(): Company = Company(
     isSynced = isSynced,
     updatedAt = updatedAt
 )
-
-fun Company.toEntity(): CompanyEntity = CompanyEntity(
-    id = id,
-    name = name,
-    joinCode = joinCode,
-    createdAt = createdAt,
-    isSynced = isSynced,
-    updatedAt = updatedAt
-)

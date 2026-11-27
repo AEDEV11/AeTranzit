@@ -159,36 +159,6 @@ class BusRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun syncPendingBuses(): Result<Int> = withContext(ioDispatcher) {
-        try {
-            if (!syncPreferencesRepository.isCloudSyncEnabled.first()) {
-                return@withContext Result.failure(
-                    IllegalStateException("Enable Cloud Sync in Settings before syncing.")
-                )
-            }
-            val companyId = activeCompanyProvider.getActiveCompanyId()
-                ?: return@withContext Result.success(0)
-
-            val unsynced = busDao.getUnsyncedByCompany(companyId)
-            var syncedCount = 0
-            for (bus in unsynced) {
-                if (fleetSyncDataSource.pushBus(bus).isSuccess) {
-                    val syncedAt = System.currentTimeMillis()
-                    busDao.markSynced(bus.id, syncedAt)
-                    syncedCount++
-                }
-            }
-            if (syncedCount > 0) {
-                syncPreferencesRepository.updateLastSyncedAt(System.currentTimeMillis())
-            }
-            Result.success(syncedCount)
-        } catch (ce: CancellationException) {
-            throw ce
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
     private companion object {
         const val MIN_SEATS = 10
         const val MAX_SEATS = 80

@@ -24,6 +24,5 @@ interface AuthRepository {
     ): Result<User>
     suspend fun completeForcedPasswordChange(newPassword: String): Result<User>
     suspend fun setUserActiveStatus(userId: String, isActive: Boolean): Result<Unit>
-    suspend fun syncPendingUsers(): Result<Int>
     suspend fun logout()
 }

@@ -52,7 +52,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -122,7 +123,10 @@ fun ConductorTicketingScreen(
     )
 
     if (uiState.selectedSeatForIssue != null) {
-        val issueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val issueSheetState = rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
+        )
         ModalBottomSheet(
             onDismissRequest = { handleEvent(ConductorTicketingUiEvent.DismissIssueSheet) },
             sheetState = issueSheetState,
@@ -147,7 +151,10 @@ fun ConductorTicketingScreen(
 
     val inspectedTicket = uiState.inspectedTicket
     if (inspectedTicket != null) {
-        val detailsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val detailsSheetState = rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
+        )
         ModalBottomSheet(
             onDismissRequest = { handleEvent(ConductorTicketingUiEvent.DismissInspectedTicket) },
             sheetState = detailsSheetState,

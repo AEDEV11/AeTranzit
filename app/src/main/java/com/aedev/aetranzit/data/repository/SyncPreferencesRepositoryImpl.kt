@@ -29,6 +29,10 @@ class SyncPreferencesRepositoryImpl @Inject constructor(
         prefs[KEY_SESSION_USER_ID]
     }
 
+    override val hasCompletedOnboarding: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_HAS_COMPLETED_ONBOARDING] ?: false
+    }
+
     override suspend fun setCloudSyncEnabled(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[KEY_CLOUD_SYNC_ENABLED] = enabled
@@ -51,9 +55,16 @@ class SyncPreferencesRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun setOnboardingCompleted(completed: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[KEY_HAS_COMPLETED_ONBOARDING] = completed
+        }
+    }
+
     private companion object {
         val KEY_CLOUD_SYNC_ENABLED = booleanPreferencesKey("cloud_sync_enabled")
         val KEY_LAST_SYNCED_AT = longPreferencesKey("last_synced_at")
         val KEY_SESSION_USER_ID = stringPreferencesKey("session_user_id")
+        val KEY_HAS_COMPLETED_ONBOARDING = booleanPreferencesKey("has_completed_onboarding")
     }
 }

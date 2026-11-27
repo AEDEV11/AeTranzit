@@ -170,8 +170,6 @@ private class FakeAuthRepository : AuthRepository {
     override suspend fun setUserActiveStatus(userId: String, isActive: Boolean): Result<Unit> =
         Result.success(Unit)
 
-    override suspend fun syncPendingUsers(): Result<Int> = Result.success(0)
-
     override suspend fun logout() {
         currentUser.value = null
     }

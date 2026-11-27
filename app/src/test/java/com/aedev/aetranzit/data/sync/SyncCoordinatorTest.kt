@@ -373,10 +373,12 @@ private class FakeSyncPrefs : SyncPreferencesRepository {
     private val enabled = MutableStateFlow(true)
     private val lastSynced = MutableStateFlow<Long?>(null)
     private val sessionUser = MutableStateFlow<String?>(null)
+    private val onboardingCompleted = MutableStateFlow(false)
 
     override val isCloudSyncEnabled: Flow<Boolean> = enabled
     override val lastSyncedAt: Flow<Long?> = lastSynced
     override val sessionUserId: Flow<String?> = sessionUser
+    override val hasCompletedOnboarding: Flow<Boolean> = onboardingCompleted
 
     override suspend fun setCloudSyncEnabled(enabled: Boolean) {
         this.enabled.value = enabled
@@ -386,6 +388,9 @@ private class FakeSyncPrefs : SyncPreferencesRepository {
     }
     override suspend fun setSessionUserId(userId: String?) {
         sessionUser.value = userId
+    }
+    override suspend fun setOnboardingCompleted(completed: Boolean) {
+        onboardingCompleted.value = completed
     }
 }
 
@@ -440,9 +445,6 @@ private class RecordingFleetRemote(
         log += "push:company:${company.id}"
         return Result.success(Unit)
     }
-
-    override suspend fun fetchCompanyByJoinCode(joinCode: String): Result<CompanyEntity?> =
-        Result.success(null)
 
     override suspend fun fetchCompanyById(companyId: String): Result<CompanyEntity?> {
         log += "pull:company:$companyId"
@@ -522,8 +524,6 @@ private class FakeCompanyDao : CompanyDao {
         items.value.firstOrNull { it.joinCode.equals(joinCode, ignoreCase = true) }
     override suspend fun getUnsyncedByCompany(companyId: String): List<CompanyEntity> =
         items.value.filter { it.id == companyId && !it.isSynced }
-    override suspend fun getUnsynced(): List<CompanyEntity> =
-        items.value.filter { !it.isSynced }
     override suspend fun markSynced(id: String, syncedAt: Long) {
         items.value = items.value.map {
             if (it.id == id) it.copy(isSynced = true, updatedAt = syncedAt) else it
@@ -659,8 +659,6 @@ private class FakeTripDao : TripDao {
     }
     override fun observeByCompany(companyId: String): Flow<List<TripEntity>> =
         items.map { list -> list.filter { it.companyId == companyId } }
-    override fun observeByConductor(conductorId: String, companyId: String): Flow<List<TripEntity>> =
-        items.map { list -> list.filter { it.conductorId == conductorId && it.companyId == companyId } }
     override fun observeActiveTripByConductor(conductorId: String, companyId: String): Flow<TripEntity?> =
         items.map { list ->
             list.firstOrNull { it.conductorId == conductorId && it.companyId == companyId && it.status == "ACTIVE" }

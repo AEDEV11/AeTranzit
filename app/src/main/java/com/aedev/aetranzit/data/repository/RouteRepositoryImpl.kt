@@ -175,34 +175,4 @@ class RouteRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
-
-    override suspend fun syncPendingRoutes(): Result<Int> = withContext(ioDispatcher) {
-        try {
-            if (!syncPreferencesRepository.isCloudSyncEnabled.first()) {
-                return@withContext Result.failure(
-                    IllegalStateException("Enable Cloud Sync in Settings before syncing.")
-                )
-            }
-            val companyId = activeCompanyProvider.getActiveCompanyId()
-                ?: return@withContext Result.success(0)
-
-            val unsynced = routeDao.getUnsyncedByCompany(companyId)
-            var syncedCount = 0
-            for (route in unsynced) {
-                if (fleetSyncDataSource.pushRoute(route).isSuccess) {
-                    val syncedAt = System.currentTimeMillis()
-                    routeDao.markSynced(route.id, syncedAt)
-                    syncedCount++
-                }
-            }
-            if (syncedCount > 0) {
-                syncPreferencesRepository.updateLastSyncedAt(System.currentTimeMillis())
-            }
-            Result.success(syncedCount)
-        } catch (ce: CancellationException) {
-            throw ce
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
 }

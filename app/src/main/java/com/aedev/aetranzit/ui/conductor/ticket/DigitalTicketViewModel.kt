@@ -203,11 +203,7 @@ class DigitalTicketViewModel @Inject constructor(
             )
         } else {
             val formattedTimestamp = payloadFormatter.formatTimestamp(ticket.createdAt)
-            val qrPayload = payloadFormatter.buildQrPayload(
-                ticket = ticket,
-                busNumber = busNumber,
-                routeLabel = routeLabel
-            )
+            val qrPayload = payloadFormatter.buildQrPayload(ticket = ticket)
             val smsReceiptText = payloadFormatter.buildSmsReceiptText(
                 ticket = ticket,
                 companyName = companyName,

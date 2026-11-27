@@ -25,7 +25,6 @@ import javax.inject.Singleton
 
 interface FleetSyncRemoteDataSource {
     suspend fun pushCompany(company: CompanyEntity): Result<Unit>
-    suspend fun fetchCompanyByJoinCode(joinCode: String): Result<CompanyEntity?>
     suspend fun fetchCompanyById(companyId: String): Result<CompanyEntity?>
     suspend fun fetchUsersByCompany(companyId: String): Result<List<UserEntity>>
     suspend fun fetchBusesByCompany(companyId: String): Result<List<BusEntity>>
@@ -72,26 +71,6 @@ class FirebaseFleetSyncDataSource @Inject constructor(
                 }
             }
             docRef.set(payload, SetOptions.merge()).await()
-        }
-
-    override suspend fun fetchCompanyByJoinCode(joinCode: String): Result<CompanyEntity?> =
-        runFirestoreQuery("company join-code lookup") {
-            val normalizedCode = joinCode.trim().uppercase(Locale.US)
-            if (normalizedCode.isBlank()) {
-                return@runFirestoreQuery null
-            }
-            val querySnap = firestore.collection(COMPANIES_COLLECTION)
-                .whereEqualTo("joinCode", normalizedCode)
-                .limit(1)
-                .get()
-                .await()
-
-            val doc = querySnap.documents.firstOrNull()
-            if (doc == null || !doc.exists()) {
-                null
-            } else {
-                doc.toCompanyEntity(fallbackCode = normalizedCode)
-            }
         }
 
     override suspend fun fetchCompanyById(companyId: String): Result<CompanyEntity?> =

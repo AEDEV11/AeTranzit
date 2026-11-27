@@ -120,6 +120,4 @@ private class FakeBusRepository : BusRepository {
         buses.value = buses.value.filterNot { it.id == id }
         return Result.success(Unit)
     }
-
-    override suspend fun syncPendingBuses(): Result<Int> = Result.success(0)
 }

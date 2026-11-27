@@ -16,12 +16,7 @@ class TicketPayloadFormatter @Inject constructor() {
         return "$WEB_TICKET_BASE_URL$cleanId"
     }
 
-    @Suppress("UNUSED_PARAMETER")
-    fun buildQrPayload(
-        ticket: Ticket,
-        busNumber: String = "",
-        routeLabel: String = ""
-    ): String = buildVerificationUrl(ticket.id)
+    fun buildQrPayload(ticket: Ticket): String = buildVerificationUrl(ticket.id)
 
     fun buildSmsReceiptText(
         ticket: Ticket,

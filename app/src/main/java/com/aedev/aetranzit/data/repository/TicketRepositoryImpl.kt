@@ -257,41 +257,6 @@ class TicketRepositoryImpl @Inject constructor(
             }
         }
 
-    override suspend fun syncPendingTickets(): Result<Int> = withContext(ioDispatcher) {
-        try {
-            if (!syncPreferencesRepository.isCloudSyncEnabled.first()) {
-                return@withContext Result.failure(
-                    IllegalStateException("Enable Cloud Sync in Settings before syncing.")
-                )
-            }
-            val companyId = activeCompanyProvider.getActiveCompanyId()
-                ?: return@withContext Result.success(0)
-
-            val unsynced = ticketDao.getUnsyncedByCompany(companyId)
-            var syncedCount = 0
-            val occupiedSeatsCache = mutableMapOf<String, List<String>>()
-
-            for (ticket in unsynced) {
-                val occupiedSeats = occupiedSeatsCache.getOrPut(ticket.tripId) {
-                    currentOccupiedSeats(ticket.tripId, companyId)
-                }
-                if (fleetSyncDataSource.pushTicketAndOccupiedSeats(ticket, occupiedSeats).isSuccess) {
-                    val syncedAt = System.currentTimeMillis()
-                    ticketDao.markSynced(ticket.id, syncedAt)
-                    syncedCount++
-                }
-            }
-            if (syncedCount > 0) {
-                syncPreferencesRepository.updateLastSyncedAt(System.currentTimeMillis())
-            }
-            Result.success(syncedCount)
-        } catch (ce: CancellationException) {
-            throw ce
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
     private suspend fun currentOccupiedSeats(tripId: String, companyId: String): List<String> =
         ticketDao.getActiveTicketsByTrip(tripId, companyId)
             .map { it.seatNumber }

@@ -943,11 +943,7 @@ private fun buildPreviewDigitalTicketState(
         isSynced = true,
         updatedAt = 1_764_144_000_000L
     )
-    val qrPayload = formatter.buildQrPayload(
-        ticket = sampleTicket,
-        busNumber = bus.busNumber,
-        routeLabel = route.displayName
-    )
+    val qrPayload = formatter.buildQrPayload(ticket = sampleTicket)
     val previewCompanyName = "Victory Liner"
     val smsText = formatter.buildSmsReceiptText(
         ticket = sampleTicket,
