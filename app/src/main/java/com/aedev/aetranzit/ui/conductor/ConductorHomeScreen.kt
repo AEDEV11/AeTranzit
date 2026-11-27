@@ -1,14 +1,23 @@
 package com.aedev.aetranzit.ui.conductor
 
+import android.content.res.Configuration
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
@@ -22,7 +31,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,27 +40,36 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aedev.aetranzit.R
 import com.aedev.aetranzit.domain.model.Bus
 import com.aedev.aetranzit.domain.model.Route
 import com.aedev.aetranzit.domain.model.RouteStop
 import com.aedev.aetranzit.domain.model.Trip
 import com.aedev.aetranzit.domain.model.TripStatus
+import com.aedev.aetranzit.ui.components.AeEmptyStateCard
 import com.aedev.aetranzit.ui.components.AePrimaryButton
 import com.aedev.aetranzit.ui.components.SyncBadgeUiState
 import com.aedev.aetranzit.ui.components.SyncStatusBadge
 import com.aedev.aetranzit.ui.components.formatPhp
 import com.aedev.aetranzit.ui.theme.AeDimens
 import com.aedev.aetranzit.ui.theme.AeTranzitTheme
+import com.aedev.aetranzit.ui.theme.DeepNavy
+import com.aedev.aetranzit.ui.theme.HeroHeaderBottomShape
+import com.aedev.aetranzit.ui.theme.NavySubtleText
+import com.aedev.aetranzit.ui.theme.PureWhite
 import com.aedev.aetranzit.ui.theme.TabularAmountStyle
+import com.aedev.aetranzit.ui.theme.TabularLabelStyle
 import java.text.DateFormat
 import java.util.Date
 
@@ -81,7 +98,6 @@ fun ConductorHomeScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConductorHomeContent(
     userName: String,
@@ -96,23 +112,13 @@ fun ConductorHomeContent(
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text("Conductor Console") },
-                actions = {
-                    IconButton(
-                        onClick = onOpenSettings,
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
-                    ) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
-                    IconButton(
-                        onClick = onLogout,
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Logout")
-                    }
-                }
+            ConductorDutyHeroHeader(
+                userName = userName,
+                syncBadgeState = syncBadgeState.copy(isCloudSyncEnabled = isCloudSyncEnabled),
+                onOpenSettings = onOpenSettings,
+                onLogout = onLogout
             )
         }
     ) { innerPadding ->
@@ -124,12 +130,6 @@ fun ConductorHomeContent(
                 .padding(AeDimens.SpaceMd),
             verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceMd)
         ) {
-            ConductorDutyHeaderCard(
-                userName = userName,
-                syncBadgeState = syncBadgeState.copy(isCloudSyncEnabled = isCloudSyncEnabled),
-                onOpenSettings = onOpenSettings
-            )
-
             if (uiState.statusMessage != null) {
                 Surface(
                     color = if (uiState.isErrorMessage) {
@@ -157,7 +157,10 @@ fun ConductorHomeContent(
                             },
                             modifier = Modifier.weight(1f)
                         )
-                        TextButton(onClick = { onEvent(ConductorHomeUiEvent.ClearMessage) }) {
+                        TextButton(
+                            onClick = { onEvent(ConductorHomeUiEvent.ClearMessage) },
+                            modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                        ) {
                             Text("Dismiss")
                         }
                     }
@@ -181,11 +184,18 @@ fun ConductorHomeContent(
 
             OutlinedButton(
                 onClick = onOpenSettings,
-                shape = MaterialTheme.shapes.medium,
+                shape = CircleShape,
+                border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outline),
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = AeDimens.PrimaryButtonHeight)
             ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(AeDimens.IconSm)
+                )
+                Spacer(modifier = Modifier.width(AeDimens.SpaceSm))
                 Text("Open Sync & Settings", style = MaterialTheme.typography.labelLarge)
             }
         }
@@ -223,46 +233,97 @@ fun ConductorHomeContent(
 }
 
 @Composable
-private fun ConductorDutyHeaderCard(
+private fun ConductorDutyHeroHeader(
     userName: String,
     syncBadgeState: SyncBadgeUiState,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onLogout: () -> Unit
 ) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        color = DeepNavy,
+        shape = HeroHeaderBottomShape,
+        shadowElevation = AeDimens.ElevatedCardElevation
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(AeDimens.SpaceMd),
-            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
+                .statusBarsPadding()
+                .padding(
+                    start = AeDimens.SpaceMd,
+                    end = AeDimens.SpaceSm,
+                    top = AeDimens.SpaceSmPlus,
+                    bottom = AeDimens.SpaceMd
+                ),
+            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus)
         ) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    imageVector = Icons.Default.DirectionsBus,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "On Duty: $userName",
-                        style = MaterialTheme.typography.titleLarge
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_brand_bus_emblem),
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(AeDimens.HeaderEmblemSize)
                     )
-                    Text(
-                        text = "Role: Conductor • Seamless Offline Queue",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column {
+                        Text(
+                            text = "On Duty: $userName",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = PureWhite,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "Conductor Console • Offline Queue Ready",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = NavySubtleText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onOpenSettings,
+                        modifier = Modifier.sizeIn(
+                            minWidth = AeDimens.MinTouchTarget,
+                            minHeight = AeDimens.MinTouchTarget
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = PureWhite
+                        )
+                    }
+                    IconButton(
+                        onClick = onLogout,
+                        modifier = Modifier.sizeIn(
+                            minWidth = AeDimens.MinTouchTarget,
+                            minHeight = AeDimens.MinTouchTarget
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Logout,
+                            contentDescription = "Logout",
+                            tint = PureWhite
+                        )
+                    }
                 }
             }
+
             SyncStatusBadge(
                 state = syncBadgeState,
+                onDarkHeader = true,
                 onClick = onOpenSettings
             )
         }
@@ -276,75 +337,67 @@ private fun StartNewTripCard(
 ) {
     val missingFleetOrRoutes = uiState.buses.isEmpty() || uiState.routes.isEmpty()
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(AeDimens.SpaceMd),
-            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceMd)
+    if (missingFleetOrRoutes) {
+        Column(verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus)) {
+            AeEmptyStateCard(
+                illustrationRes = R.drawable.empty_fleet_route,
+                title = when {
+                    uiState.buses.isEmpty() && uiState.routes.isEmpty() ->
+                        "No Buses or Routes Configured"
+                    uiState.buses.isEmpty() ->
+                        "No Buses Configured Yet"
+                    else ->
+                        "No Routes Configured Yet"
+                },
+                subtitle = "Have an Admin add your fleet and fare routes from the Admin Operations Hub, or seed sample fleet & route data now.",
+                actionLabel = if (uiState.isSubmitting) null else "Seed Sample Fleet & Route",
+                onActionClick = { onEvent(ConductorHomeUiEvent.SeedSampleFleetAndRoute) }
+            )
+        }
+    } else {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.extraLarge,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.ElevatedCardElevation),
+            border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(AeDimens.SpaceLg),
+                verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceMd)
             ) {
-                Icon(
-                    imageVector = Icons.Default.PlayCircle,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "Start New Trip",
-                    style = MaterialTheme.typography.titleLarge
-                )
-            }
-
-            if (missingFleetOrRoutes) {
-                Surface(
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(AeDimens.SpaceMd),
-                        verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
+                    Surface(
+                        modifier = Modifier.size(AeDimens.ActionRowIconBadgeSize),
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.primaryContainer
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(AeDimens.SpaceSm)
+                        )
+                    }
+                    Column {
                         Text(
-                            text = when {
-                                uiState.buses.isEmpty() && uiState.routes.isEmpty() ->
-                                    "No buses or routes are configured on this device yet."
-                                uiState.buses.isEmpty() ->
-                                    "No buses are configured yet."
-                                else ->
-                                    "No routes are configured yet."
-                            },
-                            style = MaterialTheme.typography.titleSmall,
+                            text = "Start New Trip",
+                            style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Have an Admin add your fleet and routes from the Admin Dashboard, or seed sample fleet & route data now.",
+                            text = "Assign your bus unit and route to open the seat map",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        OutlinedButton(
-                            onClick = { onEvent(ConductorHomeUiEvent.SeedSampleFleetAndRoute) },
-                            enabled = !uiState.isSubmitting,
-                            shape = MaterialTheme.shapes.medium,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = AeDimens.MinTouchTarget)
-                        ) {
-                            Text("Seed Sample Fleet & Route")
-                        }
                     }
                 }
-            } else {
+
                 Text(
                     text = "1. Select Bus",
                     style = MaterialTheme.typography.titleSmall,
@@ -385,6 +438,8 @@ private fun StartNewTripCard(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(AeDimens.SpaceXxs))
+
                 AePrimaryButton(
                     text = "Start Trip",
                     isLoading = uiState.isSubmitting,
@@ -413,11 +468,11 @@ private fun SelectableOptionRow(
             MaterialTheme.colorScheme.surfaceVariant
         },
         border = BorderStroke(
-            width = AeDimens.BorderWidth,
+            width = if (selected) AeDimens.BorderWidthThick else AeDimens.BorderWidth,
             color = if (selected) {
                 MaterialTheme.colorScheme.primary
             } else {
-                MaterialTheme.colorScheme.outline
+                MaterialTheme.colorScheme.outlineVariant
             }
         ),
         modifier = Modifier
@@ -443,7 +498,7 @@ private fun SelectableOptionRow(
                 )
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = TabularLabelStyle.merge(MaterialTheme.typography.bodySmall),
                     color = if (selected) {
                         MaterialTheme.colorScheme.onPrimaryContainer
                     } else {
@@ -495,14 +550,15 @@ private fun ActiveTripSummaryCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.ElevatedCardElevation),
+        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(AeDimens.SpaceMd),
+                .padding(AeDimens.SpaceLg),
             verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceMd)
         ) {
             Row(
@@ -515,12 +571,13 @@ private fun ActiveTripSummaryCard(
                     style = MaterialTheme.typography.titleLarge
                 )
                 Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.secondaryContainer
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.secondary)
                 ) {
                     Row(
                         modifier = Modifier.padding(
-                            horizontal = AeDimens.SpaceSm,
+                            horizontal = AeDimens.SpaceSmPlus,
                             vertical = AeDimens.SpaceXs
                         ),
                         verticalAlignment = Alignment.CenterVertically,
@@ -529,11 +586,12 @@ private fun ActiveTripSummaryCard(
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(AeDimens.IconXs)
                         )
                         Text(
                             text = details.trip.status.displayName.uppercase(),
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     }
@@ -541,8 +599,9 @@ private fun ActiveTripSummaryCard(
             }
 
             Surface(
-                shape = MaterialTheme.shapes.medium,
+                shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.surfaceVariant,
+                border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -564,7 +623,7 @@ private fun ActiveTripSummaryCard(
                             text = details.bus?.let {
                                 "Bus ${it.busNumber} • Plate ${it.plateNumber} (${it.totalSeats} seats, ${it.layoutLabel})"
                             } ?: "Bus ID: ${details.trip.busId}",
-                            style = MaterialTheme.typography.titleSmall
+                            style = TabularLabelStyle.merge(MaterialTheme.typography.titleSmall)
                         )
                     }
 
@@ -610,7 +669,7 @@ private fun ActiveTripSummaryCard(
             OutlinedButton(
                 onClick = onRequestEndTrip,
                 enabled = !isSubmitting,
-                shape = MaterialTheme.shapes.medium,
+                shape = CircleShape,
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.error
                 ),
@@ -636,13 +695,18 @@ private fun ActiveTripSummaryCard(
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, name = "Conductor Home - Start Trip Light")
+@Preview(
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    name = "Conductor Home - Start Trip Dark"
+)
 @Composable
 private fun ConductorHomeNoActiveTripPreview() {
     AeTranzitTheme {
         ConductorHomeContent(
             userName = "Juan Dela Cruz",
-            isCloudSyncEnabled = false,
+            isCloudSyncEnabled = true,
             uiState = ConductorHomeUiState(
                 buses = listOf(
                     Bus(
@@ -677,7 +741,23 @@ private fun ConductorHomeNoActiveTripPreview() {
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, name = "Conductor Home - Empty Fleet")
+@Composable
+private fun ConductorHomeEmptyFleetPreview() {
+    AeTranzitTheme {
+        ConductorHomeContent(
+            userName = "Juan Dela Cruz",
+            isCloudSyncEnabled = true,
+            uiState = ConductorHomeUiState(),
+            onEvent = {},
+            onOpenTicketing = {},
+            onOpenSettings = {},
+            onLogout = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Conductor Home - Active Trip")
 @Composable
 private fun ConductorHomeActiveTripPreview() {
     val bus = Bus(

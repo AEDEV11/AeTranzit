@@ -16,20 +16,29 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.DirectionsBus
-import androidx.compose.material.icons.filled.EventSeat
+import androidx.compose.material.icons.filled.LocalOffer
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,8 +53,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -54,10 +63,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -84,7 +95,9 @@ import com.aedev.aetranzit.ui.theme.BlueContainerLight
 import com.aedev.aetranzit.ui.theme.BlueOnContainerLight
 import com.aedev.aetranzit.ui.theme.DeepNavy
 import com.aedev.aetranzit.ui.theme.ElectricBlue
-import com.aedev.aetranzit.ui.theme.LightOutline
+import com.aedev.aetranzit.ui.theme.LightOutlineVariant
+import com.aedev.aetranzit.ui.theme.NavySubtleText
+import com.aedev.aetranzit.ui.theme.PureWhite
 import com.aedev.aetranzit.ui.theme.TabularAmountStyle
 import com.aedev.aetranzit.ui.theme.TealContainerLight
 import com.aedev.aetranzit.ui.theme.TealOnContainerLight
@@ -93,7 +106,7 @@ import com.aedev.aetranzit.ui.theme.TicketPaperDivider
 import com.aedev.aetranzit.ui.theme.TicketPaperInk
 import com.aedev.aetranzit.ui.theme.TicketPaperSectionBg
 import com.aedev.aetranzit.ui.theme.TicketPaperSubtleInk
-import com.aedev.aetranzit.ui.theme.TransitTealDark
+import com.aedev.aetranzit.ui.theme.TransitTeal
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -194,6 +207,7 @@ fun DigitalTicketContent(
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
@@ -220,7 +234,10 @@ fun DigitalTicketContent(
                 navigationIcon = {
                     IconButton(
                         onClick = onNavigateBack,
-                        modifier = Modifier.size(AeDimens.MinTouchTarget)
+                        modifier = Modifier.sizeIn(
+                            minWidth = AeDimens.MinTouchTarget,
+                            minHeight = AeDimens.MinTouchTarget
+                        )
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -239,8 +256,7 @@ fun DigitalTicketContent(
                     },
                     onSendSmsReceipt = {
                         onEvent(DigitalTicketUiEvent.SendSmsRequested)
-                    },
-                    onBackToSeatMap = onNavigateBack
+                    }
                 )
             }
         }
@@ -266,6 +282,11 @@ fun DigitalTicketContent(
                 )
             }
             else -> {
+                val originStop = remember(uiState.route, uiState.routeLabel) {
+                    uiState.route?.origin?.takeIf { it.isNotBlank() }
+                        ?: uiState.routeLabel.substringBefore("→").trim().ifBlank { uiState.routeLabel }
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -288,11 +309,13 @@ fun DigitalTicketContent(
                     PhotoReadyTicketCard(
                         companyName = uiState.companyName,
                         ticket = uiState.ticket,
+                        originStop = originStop,
                         busNumber = uiState.busNumber,
                         plateNumber = uiState.plateNumber,
                         routeLabel = uiState.routeLabel,
                         conductorName = uiState.conductorName,
                         issuedTimestamp = uiState.issuedTimestamp,
+                        notchCutoutColor = MaterialTheme.colorScheme.background,
                         qrImageBitmap = qrImageBitmap
                     )
 
@@ -307,11 +330,13 @@ fun DigitalTicketContent(
 private fun PhotoReadyTicketCard(
     companyName: String,
     ticket: Ticket,
+    originStop: String,
     busNumber: String,
     plateNumber: String,
     routeLabel: String,
     conductorName: String,
     issuedTimestamp: String,
+    notchCutoutColor: Color,
     qrImageBitmap: ImageBitmap?,
     modifier: Modifier = Modifier
 ) {
@@ -320,23 +345,23 @@ private fun PhotoReadyTicketCard(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(
             containerColor = TicketPaperBackground,
             contentColor = TicketPaperInk
         ),
-        border = BorderStroke(AeDimens.BorderWidth, LightOutline),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        border = BorderStroke(AeDimens.BorderWidth, LightOutlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.ElevatedCardElevation)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // High-Contrast Deep Navy Ticket Header
+            // High-Contrast Deep Navy Ticket Header with Bus Emblem
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(DeepNavy)
                     .padding(
                         horizontal = AeDimens.SpaceMd,
-                        vertical = AeDimens.SpaceSmPlus
+                        vertical = AeDimens.SpaceMd
                     ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -345,34 +370,25 @@ private fun PhotoReadyTicketCard(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Surface(
-                        shape = MaterialTheme.shapes.small,
-                        color = TicketPaperBackground,
-                        modifier = Modifier.size(AeDimens.TicketLogoSize)
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.logo),
-                            contentDescription = "AeTranzit Logo",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(AeDimens.SpaceXs)
-                        )
-                    }
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_brand_bus_emblem),
+                        contentDescription = "AeTranzit Bus Emblem",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(AeDimens.HeaderEmblemSize)
+                    )
                     Spacer(modifier = Modifier.width(AeDimens.SpaceSmPlus))
                     Column {
                         Text(
                             text = resolvedCompanyName,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = TicketPaperBackground,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = PureWhite,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = "OFFICIAL BUS PASSENGER RECEIPT",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TransitTealDark,
+                            text = "Official Bus Passenger Receipt",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = NavySubtleText,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -387,99 +403,228 @@ private fun PhotoReadyTicketCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(AeDimens.SpaceMd),
+                    .padding(horizontal = AeDimens.SpaceMd, vertical = AeDimens.SpaceMd),
                 verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus)
             ) {
-                // Reference # & Large Seat # Hero Row
+                // Departure -> Destination Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "TICKET REF",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TicketPaperSubtleInk
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = ElectricBlue,
+                            modifier = Modifier.size(AeDimens.IconSm)
                         )
-                        Text(
-                            text = "#${ticket.referenceCode}",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = TicketPaperInk
-                        )
+                        Column {
+                            Text(
+                                text = "Departure",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TicketPaperSubtleInk
+                            )
+                            Text(
+                                text = originStop,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TicketPaperInk,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
 
-                    Surface(
-                        shape = MaterialTheme.shapes.medium,
-                        color = ElectricBlue,
-                        contentColor = TicketPaperBackground,
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = TicketPaperSubtleInk,
                         modifier = Modifier
-                            .widthIn(min = AeDimens.TicketSeatBadgeMinWidth)
-                            .semantics {
-                                contentDescription = "Seat ${ticket.seatNumber}"
-                            }
+                            .padding(horizontal = AeDimens.SpaceXs)
+                            .size(AeDimens.IconSm)
+                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "Drop-off Stop",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TicketPaperSubtleInk
+                            )
+                            Text(
+                                text = ticket.destination,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TicketPaperInk,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(AeDimens.SpaceXs))
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = TransitTeal,
+                            modifier = Modifier.size(AeDimens.IconSm)
+                        )
+                    }
+                }
+
+                // Full-Width Electric Blue Hero SEAT Banner
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics {
+                            contentDescription = "Seat ${ticket.seatNumber}, Reference ${ticket.referenceCode}"
+                        },
+                    shape = MaterialTheme.shapes.large,
+                    color = ElectricBlue,
+                    contentColor = PureWhite
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal = AeDimens.SpaceMd,
+                                vertical = AeDimens.SpaceSmPlus
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceMd)
                     ) {
                         Column(
-                            modifier = Modifier.padding(
-                                horizontal = AeDimens.SpaceMd,
-                                vertical = AeDimens.SpaceSm
-                            ),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.widthIn(min = AeDimens.TicketSeatBadgeMinWidth)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceXxs)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.EventSeat,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(AeDimens.IconXs)
-                                )
-                                Text(
-                                    text = "SEAT",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            Text(
+                                text = "SEAT",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = PureWhite
+                            )
                             Text(
                                 text = ticket.seatNumber,
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold
+                                style = TabularAmountStyle.copy(
+                                    fontSize = MaterialTheme.typography.displaySmall.fontSize,
+                                    lineHeight = MaterialTheme.typography.displaySmall.lineHeight
+                                ),
+                                color = PureWhite
+                            )
+                        }
+
+                        VerticalDivider(
+                            modifier = Modifier.height(AeDimens.TicketSeatDividerHeight),
+                            thickness = AeDimens.BorderWidth,
+                            color = PureWhite.copy(alpha = 0.35f)
+                        )
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceXxs)
+                        ) {
+                            Text(
+                                text = "Ref #${ticket.referenceCode}",
+                                style = TabularAmountStyle.copy(
+                                    fontSize = MaterialTheme.typography.titleMedium.fontSize
+                                ),
+                                color = PureWhite,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "Bus $busNumber • $plateNumber",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = PureWhite.copy(alpha = 0.9f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = routeLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = PureWhite.copy(alpha = 0.8f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
                 }
 
-                PerforatedTicketDivider()
+                // Centered Passenger / Discount Pill
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (ticket.passengerType.isDiscounted) {
+                        Surface(
+                            shape = CircleShape,
+                            color = TealContainerLight,
+                            contentColor = TealOnContainerLight,
+                            border = BorderStroke(AeDimens.BorderWidth, TransitTeal)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(
+                                    horizontal = AeDimens.SpaceMd,
+                                    vertical = AeDimens.SpaceXs
+                                ),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocalOffer,
+                                    contentDescription = null,
+                                    tint = TealOnContainerLight,
+                                    modifier = Modifier.size(AeDimens.IconXs)
+                                )
+                                Text(
+                                    text = "-20% ${ticket.passengerType.displayName} Discount",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    } else {
+                        Surface(
+                            shape = CircleShape,
+                            color = TicketPaperSectionBg,
+                            contentColor = TicketPaperInk,
+                            border = BorderStroke(AeDimens.BorderWidth, TicketPaperDivider)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(
+                                    horizontal = AeDimens.SpaceMd,
+                                    vertical = AeDimens.SpaceXs
+                                ),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ConfirmationNumber,
+                                    contentDescription = null,
+                                    tint = ElectricBlue,
+                                    modifier = Modifier.size(AeDimens.IconXs)
+                                )
+                                Text(
+                                    text = "Passenger: ${ticket.passengerType.displayName}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
 
-                // Route, Destination, Bus & Passenger Metadata
-                TicketMetadataRow(
-                    label = "Route",
-                    value = routeLabel
-                )
-                TicketMetadataRow(
-                    label = "Drop-off Stop",
-                    value = ticket.destination
-                )
-                TicketMetadataRow(
-                    label = "Bus & Plate",
-                    value = "$busNumber • $plateNumber"
-                )
-                PassengerTypeTicketRow(passengerType = ticket.passengerType)
-                TicketMetadataRow(
-                    label = "Conductor",
-                    value = conductorName
-                )
-                TicketMetadataRow(
-                    label = "Issued",
-                    value = issuedTimestamp
-                )
-
-                // Fare / Cash / Change Box (Tabular Numerals)
+                // Fare / Cash / Change Tabular Rows
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
+                    shape = MaterialTheme.shapes.large,
                     color = TicketPaperSectionBg,
                     border = BorderStroke(AeDimens.BorderWidth, TicketPaperDivider)
                 ) {
@@ -487,91 +632,114 @@ private fun PhotoReadyTicketCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(AeDimens.SpaceSmPlus),
-                        verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
+                        verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Fare Paid",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = TicketPaperInk
-                            )
-                            Text(
-                                text = formatPhp(ticket.fareAmount),
-                                style = TabularAmountStyle.copy(
-                                    fontSize = MaterialTheme.typography.headlineSmall.fontSize,
-                                    lineHeight = MaterialTheme.typography.headlineSmall.lineHeight
-                                ),
-                                color = ElectricBlue
-                            )
-                        }
-
-                        HorizontalDivider(color = TicketPaperDivider)
-
                         TicketAmountRow(
+                            icon = Icons.Default.Payments,
+                            iconTint = ElectricBlue,
+                            label = "Fare Paid",
+                            amount = formatPhp(ticket.fareAmount),
+                            emphasize = true
+                        )
+                        HorizontalDivider(color = TicketPaperDivider)
+                        TicketAmountRow(
+                            icon = Icons.Default.AccountBalanceWallet,
+                            iconTint = TransitTeal,
                             label = "Cash Tendered",
-                            amount = formatPhp(ticket.cashTendered)
+                            amount = formatPhp(ticket.cashTendered),
+                            emphasize = false
                         )
                         TicketAmountRow(
+                            icon = Icons.Default.CurrencyExchange,
+                            iconTint = ElectricBlue,
                             label = "Change Given",
-                            amount = formatPhp(ticket.changeAmount)
+                            amount = formatPhp(ticket.changeAmount),
+                            emphasize = false
                         )
                     }
                 }
 
-                PerforatedTicketDivider()
-
-                // Pure-White High-Contrast QR Surface (Guaranteed Scannable in Light & Dark Mode)
-                Column(
+                // Compact Conductor & Timestamp Metadata
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(
-                        shape = MaterialTheme.shapes.medium,
-                        color = TicketPaperBackground,
-                        border = BorderStroke(AeDimens.BorderWidth, TicketPaperDivider)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .padding(AeDimens.QrContainerPadding)
-                                .size(AeDimens.QrCodeSize),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (qrImageBitmap != null) {
-                                Image(
-                                    bitmap = qrImageBitmap,
-                                    contentDescription = "Verification QR code for ticket #${ticket.referenceCode}",
-                                    filterQuality = FilterQuality.None,
-                                    contentScale = ContentScale.FillBounds,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            } else {
-                                CircularProgressIndicator(
-                                    color = ElectricBlue,
-                                    modifier = Modifier.size(AeDimens.IconLg)
-                                )
-                            }
-                        }
-                    }
-
                     Text(
-                        text = "Passenger can scan this QR to open their web receipt copy",
+                        text = "Conductor: $conductorName",
                         style = MaterialTheme.typography.bodySmall,
                         color = TicketPaperSubtleInk,
-                        textAlign = TextAlign.Center
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
+                    Spacer(modifier = Modifier.width(AeDimens.SpaceSm))
                     Text(
-                        text = "Powered by AeTranzit",
-                        style = MaterialTheme.typography.labelSmall,
+                        text = issuedTimestamp,
+                        style = MaterialTheme.typography.bodySmall,
                         color = TicketPaperSubtleInk,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.End
                     )
                 }
+            }
+
+            // Perforated Tear-Line with Side Cutout Notches
+            PerforatedTicketDivider(notchCutoutColor = notchCutoutColor)
+
+            // Pure-White High-Contrast QR Surface (Guaranteed Scannable in Light & Dark Mode)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = AeDimens.SpaceMd,
+                        end = AeDimens.SpaceMd,
+                        top = AeDimens.SpaceSm,
+                        bottom = AeDimens.SpaceMd
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
+            ) {
+                Surface(
+                    shape = MaterialTheme.shapes.medium,
+                    color = TicketPaperBackground,
+                    border = BorderStroke(AeDimens.BorderWidth, TicketPaperDivider)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(AeDimens.QrContainerPadding)
+                            .size(AeDimens.QrCodeSize),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (qrImageBitmap != null) {
+                            Image(
+                                bitmap = qrImageBitmap,
+                                contentDescription = "Verification QR code for ticket #${ticket.referenceCode}",
+                                filterQuality = FilterQuality.None,
+                                contentScale = ContentScale.FillBounds,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            CircularProgressIndicator(
+                                color = ElectricBlue,
+                                modifier = Modifier.size(AeDimens.IconLg)
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    text = "Scan QR to open passenger web receipt",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TicketPaperSubtleInk,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "Powered by AeTranzit",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TicketPaperSubtleInk,
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
@@ -579,19 +747,19 @@ private fun PhotoReadyTicketCard(
 
 @Composable
 private fun TicketStatusBadge(isDroppedOff: Boolean) {
-    val containerColor = if (isDroppedOff) BlueContainerLight else TealContainerLight
-    val contentColor = if (isDroppedOff) BlueOnContainerLight else TealOnContainerLight
-    val label = if (isDroppedOff) "DROPPED OFF" else "ACTIVE"
+    val containerColor = if (isDroppedOff) BlueContainerLight else TransitTeal
+    val contentColor = if (isDroppedOff) BlueOnContainerLight else DeepNavy
+    val label = if (isDroppedOff) "DROPPED OFF" else "VALID"
     val icon = if (isDroppedOff) Icons.Default.DirectionsBus else Icons.Default.CheckCircle
 
     Surface(
-        shape = MaterialTheme.shapes.small,
+        shape = CircleShape,
         color = containerColor,
         contentColor = contentColor
     ) {
         Row(
             modifier = Modifier.padding(
-                horizontal = AeDimens.SpaceSm,
+                horizontal = AeDimens.SpaceSmPlus,
                 vertical = AeDimens.SpaceXs
             ),
             verticalAlignment = Alignment.CenterVertically,
@@ -612,117 +780,86 @@ private fun TicketStatusBadge(isDroppedOff: Boolean) {
 }
 
 @Composable
-private fun PassengerTypeTicketRow(passengerType: PassengerType) {
+private fun TicketAmountRow(
+    icon: ImageVector,
+    iconTint: Color,
+    label: String,
+    amount: String,
+    emphasize: Boolean
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "Passenger Type",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TicketPaperSubtleInk
-        )
-
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
+            horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
         ) {
-            Text(
-                text = passengerType.displayName,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = TicketPaperInk
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(AeDimens.IconSm)
             )
-            if (passengerType.isDiscounted) {
-                Surface(
-                    shape = MaterialTheme.shapes.extraSmall,
-                    color = TealContainerLight,
-                    contentColor = TealOnContainerLight
-                ) {
-                    Text(
-                        text = "-20%",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(
-                            horizontal = AeDimens.SpaceXs,
-                            vertical = AeDimens.SpaceXxs
-                        )
-                    )
-                }
-            }
+            Text(
+                text = label,
+                style = if (emphasize) {
+                    MaterialTheme.typography.titleMedium
+                } else {
+                    MaterialTheme.typography.bodyMedium
+                },
+                fontWeight = if (emphasize) FontWeight.Bold else FontWeight.Medium,
+                color = if (emphasize) TicketPaperInk else TicketPaperSubtleInk
+            )
         }
-    }
-}
-
-@Composable
-private fun TicketMetadataRow(
-    label: String,
-    value: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = TicketPaperSubtleInk
-        )
-        Spacer(modifier = Modifier.width(AeDimens.SpaceMd))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = TicketPaperInk,
-            textAlign = TextAlign.End,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-@Composable
-private fun TicketAmountRow(
-    label: String,
-    amount: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = TicketPaperSubtleInk
-        )
         Text(
             text = amount,
             style = TabularAmountStyle.copy(
-                fontSize = MaterialTheme.typography.bodyLarge.fontSize,
-                lineHeight = MaterialTheme.typography.bodyLarge.lineHeight
+                fontSize = if (emphasize) {
+                    MaterialTheme.typography.headlineSmall.fontSize
+                } else {
+                    MaterialTheme.typography.titleMedium.fontSize
+                },
+                lineHeight = if (emphasize) {
+                    MaterialTheme.typography.headlineSmall.lineHeight
+                } else {
+                    MaterialTheme.typography.titleMedium.lineHeight
+                }
             ),
-            color = TicketPaperInk
+            color = if (emphasize) ElectricBlue else TicketPaperInk
         )
     }
 }
 
 @Composable
-private fun PerforatedTicketDivider() {
-    val dashEffect = remember { PathEffect.dashPathEffect(floatArrayOf(16f, 12f), 0f) }
+private fun PerforatedTicketDivider(notchCutoutColor: Color) {
+    val dashEffect = remember { PathEffect.dashPathEffect(floatArrayOf(14f, 10f), 0f) }
+    val notchHeight = AeDimens.TicketNotchRadius * 2
+
     Canvas(
         modifier = Modifier
             .fillMaxWidth()
-            .height(AeDimens.SpaceXs)
+            .height(notchHeight)
     ) {
         val centerY = size.height / 2f
+        val notchRadiusPx = size.height / 2f
         drawLine(
             color = TicketPaperDivider,
-            start = Offset(0f, centerY),
-            end = Offset(size.width, centerY),
-            strokeWidth = size.height / 2f,
+            start = Offset(notchRadiusPx, centerY),
+            end = Offset(size.width - notchRadiusPx, centerY),
+            strokeWidth = AeDimens.BorderWidthThick.toPx(),
             pathEffect = dashEffect
+        )
+        drawCircle(
+            color = notchCutoutColor,
+            radius = notchRadiusPx,
+            center = Offset(0f, centerY)
+        )
+        drawCircle(
+            color = notchCutoutColor,
+            radius = notchRadiusPx,
+            center = Offset(size.width, centerY)
         )
     }
 }
@@ -731,14 +868,13 @@ private fun PerforatedTicketDivider() {
 private fun DigitalTicketActionBar(
     isSharingImage: Boolean,
     onShareTicketImage: () -> Unit,
-    onSendSmsReceipt: () -> Unit,
-    onBackToSeatMap: () -> Unit
+    onSendSmsReceipt: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = AeDimens.CardElevation,
-        shadowElevation = AeDimens.CardElevation
+        shadowElevation = AeDimens.ElevatedCardElevation
     ) {
         Column(
             modifier = Modifier
@@ -753,16 +889,20 @@ private fun DigitalTicketActionBar(
             Button(
                 onClick = onShareTicketImage,
                 enabled = !isSharingImage,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ElectricBlue,
+                    contentColor = PureWhite
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = AeDimens.PrimaryButtonHeight),
-                shape = MaterialTheme.shapes.medium
+                shape = CircleShape
             ) {
                 if (isSharingImage) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(AeDimens.IconSm),
                         strokeWidth = AeDimens.BorderWidthThick,
-                        color = MaterialTheme.colorScheme.onPrimary
+                        color = PureWhite
                     )
                     Spacer(modifier = Modifier.width(AeDimens.SpaceSm))
                     Text(
@@ -783,42 +923,27 @@ private fun DigitalTicketActionBar(
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm),
-                verticalAlignment = Alignment.CenterVertically
+            OutlinedButton(
+                onClick = onSendSmsReceipt,
+                enabled = !isSharingImage,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = AeDimens.MinTouchTarget),
+                shape = CircleShape,
+                border = BorderStroke(AeDimens.BorderWidthThick, MaterialTheme.colorScheme.primary)
             ) {
-                OutlinedButton(
-                    onClick = onSendSmsReceipt,
-                    enabled = !isSharingImage,
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = AeDimens.MinTouchTarget),
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Sms,
-                        contentDescription = null,
-                        modifier = Modifier.size(AeDimens.IconSm)
-                    )
-                    Spacer(modifier = Modifier.width(AeDimens.SpaceXs))
-                    Text(
-                        text = "Send SMS Receipt",
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                TextButton(
-                    onClick = onBackToSeatMap,
-                    modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
-                ) {
-                    Text(
-                        text = "Back to Seat Map",
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Sms,
+                    contentDescription = null,
+                    modifier = Modifier.size(AeDimens.IconSm)
+                )
+                Spacer(modifier = Modifier.width(AeDimens.SpaceSm))
+                Text(
+                    text = "Send SMS Receipt",
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
@@ -859,7 +984,10 @@ private fun ActionErrorBanner(
             )
             IconButton(
                 onClick = onDismiss,
-                modifier = Modifier.size(AeDimens.MinTouchTarget)
+                modifier = Modifier.sizeIn(
+                    minWidth = AeDimens.MinTouchTarget,
+                    minHeight = AeDimens.MinTouchTarget
+                )
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
@@ -897,7 +1025,7 @@ private fun MissingTicketState(
         OutlinedButton(
             onClick = onBackToSeatMap,
             modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget),
-            shape = MaterialTheme.shapes.medium
+            shape = CircleShape
         ) {
             Text(text = "Back to Seat Map")
         }

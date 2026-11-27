@@ -1,6 +1,9 @@
 package com.aedev.aetranzit.ui.admin
 
 import android.content.res.Configuration
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,47 +16,53 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.AdminPanelSettings
-import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Badge
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.Discount
 import androidx.compose.material.icons.filled.EventSeat
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aedev.aetranzit.R
 import com.aedev.aetranzit.domain.usecase.AdminAnalyticsSummary
 import com.aedev.aetranzit.domain.usecase.AnalyticsDateRange
 import com.aedev.aetranzit.domain.usecase.ConductorPerformanceStat
@@ -64,7 +73,17 @@ import com.aedev.aetranzit.ui.components.SyncStatusBadge
 import com.aedev.aetranzit.ui.components.formatPhp
 import com.aedev.aetranzit.ui.theme.AeDimens
 import com.aedev.aetranzit.ui.theme.AeTranzitTheme
+import com.aedev.aetranzit.ui.theme.DeepNavy
+import com.aedev.aetranzit.ui.theme.ElectricBlue
+import com.aedev.aetranzit.ui.theme.HeroHeaderBottomShape
+import com.aedev.aetranzit.ui.theme.NavyHeaderBorder
+import com.aedev.aetranzit.ui.theme.NavyHeaderSurface
+import com.aedev.aetranzit.ui.theme.NavySubtleText
+import com.aedev.aetranzit.ui.theme.PureWhite
 import com.aedev.aetranzit.ui.theme.TabularAmountStyle
+import com.aedev.aetranzit.ui.theme.TabularLabelStyle
+import com.aedev.aetranzit.ui.theme.TransitTeal
+import com.aedev.aetranzit.ui.theme.TransitTealDark
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
@@ -128,37 +147,15 @@ fun AdminDashboardContent(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = uiState.companyName,
-                            style = MaterialTheme.typography.titleLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "Admin Operations Hub",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = onOpenSettings,
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
-                    ) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
-                    IconButton(
-                        onClick = onLogout,
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Logout")
-                    }
-                }
+            AdminOperationsHeroHeader(
+                companyName = uiState.companyName,
+                userName = userName,
+                analytics = analytics,
+                syncBadgeState = syncBadgeState.copy(isCloudSyncEnabled = isCloudSyncEnabled),
+                onOpenSettings = onOpenSettings,
+                onLogout = onLogout
             )
         }
     ) { innerPadding ->
@@ -170,13 +167,6 @@ fun AdminDashboardContent(
                 .padding(AeDimens.SpaceMd),
             verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceMd)
         ) {
-            AdminWelcomeHeaderCard(
-                userName = userName,
-                companyName = uiState.companyName,
-                syncBadgeState = syncBadgeState.copy(isCloudSyncEnabled = isCloudSyncEnabled),
-                onOpenSettings = onOpenSettings
-            )
-
             DateRangeFilterBar(
                 selectedRange = uiState.selectedDateRange,
                 onSelectRange = onSelectDateRange
@@ -195,110 +185,216 @@ fun AdminDashboardContent(
                 ConductorPerformanceCard(conductors = analytics.conductorSummaries)
             }
 
-            Text(
-                text = "Operations & Administration",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground
+            AdminOperationsDirectoryCard(
+                ticketsSoldCount = analytics.totalTicketsSold,
+                totalStaff = uiState.totalStaff,
+                activeConductorsCount = uiState.activeConductorsCount,
+                totalBuses = uiState.totalBuses,
+                totalRoutes = uiState.totalRoutes,
+                onOpenReports = onOpenReports,
+                onOpenManageStaff = onOpenManageStaff,
+                onOpenManageBuses = onOpenManageBuses,
+                onOpenManageRoutes = onOpenManageRoutes,
+                onOpenSettings = onOpenSettings
             )
 
-            AdminActionCard(
-                title = "Reports & Exports",
-                subtitle = "Filter ticket logs by bus or conductor and export RFC-4180 CSV or PDF",
-                countBadge = "${analytics.totalTicketsSold}",
-                countLabel = if (analytics.totalTicketsSold == 1) "Ticket" else "Tickets",
-                icon = Icons.Default.Assessment,
-                onClick = onOpenReports
+            Spacer(modifier = Modifier.height(AeDimens.SpaceXs))
+        }
+    }
+}
+
+@Composable
+private fun AdminOperationsHeroHeader(
+    companyName: String,
+    userName: String,
+    analytics: AdminAnalyticsSummary,
+    syncBadgeState: SyncBadgeUiState,
+    onOpenSettings: () -> Unit,
+    onLogout: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = DeepNavy,
+        shape = HeroHeaderBottomShape,
+        shadowElevation = AeDimens.ElevatedCardElevation
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(
+                    start = AeDimens.SpaceMd,
+                    end = AeDimens.SpaceSm,
+                    top = AeDimens.SpaceSmPlus,
+                    bottom = AeDimens.SpaceMd
+                ),
+            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_brand_bus_emblem),
+                        contentDescription = "AeTranzit Bus Emblem",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(AeDimens.HeaderEmblemSize)
+                    )
+                    Column {
+                        Text(
+                            text = companyName,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = PureWhite,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "Admin Operations Hub • $userName",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = NavySubtleText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onOpenSettings,
+                        modifier = Modifier.sizeIn(
+                            minWidth = AeDimens.MinTouchTarget,
+                            minHeight = AeDimens.MinTouchTarget
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = PureWhite
+                        )
+                    }
+                    IconButton(
+                        onClick = onLogout,
+                        modifier = Modifier.sizeIn(
+                            minWidth = AeDimens.MinTouchTarget,
+                            minHeight = AeDimens.MinTouchTarget
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Logout,
+                            contentDescription = "Logout",
+                            tint = PureWhite
+                        )
+                    }
+                }
+            }
+
+            SyncStatusBadge(
+                state = syncBadgeState,
+                onDarkHeader = true,
+                onClick = onOpenSettings
             )
 
-            AdminActionCard(
-                title = "Manage Staff",
-                subtitle = "Provision Conductors & Co-Admins and activate or deactivate accounts",
-                countBadge = "${uiState.totalStaff}",
-                countLabel = "${uiState.activeConductorsCount} Active",
-                icon = Icons.Default.Badge,
-                onClick = onOpenManageStaff
-            )
-
-            AdminActionCard(
-                title = "Manage Buses",
-                subtitle = "Configure bus numbers, plate numbers, capacity, and 2x2 / 2x3 layouts",
-                countBadge = "${uiState.totalBuses}",
-                countLabel = if (uiState.totalBuses == 1) "Bus" else "Buses",
-                icon = Icons.Default.DirectionsBus,
-                onClick = onOpenManageBuses
-            )
-
-            AdminActionCard(
-                title = "Manage Routes",
-                subtitle = "Define origins, destinations, base fares, and intermediate stop fares",
-                countBadge = "${uiState.totalRoutes}",
-                countLabel = if (uiState.totalRoutes == 1) "Route" else "Routes",
-                icon = Icons.Default.Route,
-                onClick = onOpenManageRoutes
-            )
-
-            OutlinedButton(
-                onClick = onOpenSettings,
-                shape = MaterialTheme.shapes.medium,
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = AeDimens.PrimaryButtonHeight)
+                    .padding(end = AeDimens.SpaceSm),
+                shape = MaterialTheme.shapes.large,
+                color = NavyHeaderSurface,
+                border = BorderStroke(AeDimens.BorderWidth, NavyHeaderBorder)
             ) {
-                Text("Open Sync & Settings", style = MaterialTheme.typography.labelLarge)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = AeDimens.SpaceSmPlus,
+                            vertical = AeDimens.SpaceSmPlus
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    HeroSummaryMetric(
+                        icon = Icons.AutoMirrored.Filled.TrendingUp,
+                        label = "Revenue",
+                        value = formatPhp(analytics.totalRevenue),
+                        modifier = Modifier.weight(1.25f)
+                    )
+                    VerticalDivider(
+                        modifier = Modifier.height(AeDimens.IconLg),
+                        thickness = AeDimens.BorderWidth,
+                        color = NavyHeaderBorder
+                    )
+                    HeroSummaryMetric(
+                        icon = Icons.Default.DirectionsBus,
+                        label = "Tickets Sold",
+                        value = "${analytics.totalTicketsSold}",
+                        modifier = Modifier
+                            .weight(0.95f)
+                            .padding(start = AeDimens.SpaceSm)
+                    )
+                    VerticalDivider(
+                        modifier = Modifier.height(AeDimens.IconLg),
+                        thickness = AeDimens.BorderWidth,
+                        color = NavyHeaderBorder
+                    )
+                    HeroSummaryMetric(
+                        icon = Icons.Default.PieChart,
+                        label = "Occupancy",
+                        value = String.format(
+                            Locale.US,
+                            "%.0f%%",
+                            analytics.averageLoadFactorPercent
+                        ),
+                        modifier = Modifier
+                            .weight(0.9f)
+                            .padding(start = AeDimens.SpaceSm)
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun AdminWelcomeHeaderCard(
-    userName: String,
-    companyName: String,
-    syncBadgeState: SyncBadgeUiState,
-    onOpenSettings: () -> Unit
+private fun HeroSummaryMetric(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(AeDimens.SpaceMd),
-            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.AdminPanelSettings,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = companyName,
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "Welcome, $userName",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            SyncStatusBadge(
-                state = syncBadgeState,
-                onClick = onOpenSettings
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = TransitTealDark,
+            modifier = Modifier.size(AeDimens.IconSm)
+        )
+        Column {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = NavySubtleText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = value,
+                style = TabularAmountStyle.copy(
+                    fontSize = MaterialTheme.typography.titleMedium.fontSize,
+                    lineHeight = MaterialTheme.typography.titleMedium.lineHeight
+                ),
+                color = PureWhite,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -317,28 +413,32 @@ private fun DateRangeFilterBar(
     ) {
         AnalyticsDateRange.entries.forEach { range ->
             val isSelected = range == selectedRange
-            FilterChip(
-                selected = isSelected,
+            Surface(
                 onClick = { onSelectRange(range) },
-                label = {
+                shape = CircleShape,
+                color = if (isSelected) ElectricBlue else MaterialTheme.colorScheme.surface,
+                contentColor = if (isSelected) PureWhite else MaterialTheme.colorScheme.onSurface,
+                border = if (isSelected) {
+                    null
+                } else {
+                    BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
+                },
+                shadowElevation = if (isSelected) AeDimens.CardElevation else AeDimens.SpaceXxs / 2,
+                modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+            ) {
+                Box(
+                    modifier = Modifier.padding(
+                        horizontal = AeDimens.SpaceMd,
+                        vertical = AeDimens.SpaceSm
+                    ),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
                         text = range.chipLabel,
                         style = MaterialTheme.typography.labelLarge
                     )
-                },
-                leadingIcon = if (isSelected) {
-                    {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                            modifier = Modifier.size(AeDimens.IconXs)
-                        )
-                    }
-                } else {
-                    null
-                },
-                modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
-            )
+                }
+            }
         }
     }
 }
@@ -355,7 +455,8 @@ private fun KpiSummaryGrid(analytics: AdminAnalyticsSummary) {
                 valueText = formatPhp(analytics.totalRevenue),
                 subtitle = analytics.dateRange.reportLabel,
                 icon = Icons.Default.Payments,
-                highlightPrimary = true,
+                badgeColor = ElectricBlue,
+                badgeIconTint = PureWhite,
                 modifier = Modifier.weight(1f)
             )
             KpiStatCard(
@@ -363,7 +464,8 @@ private fun KpiSummaryGrid(analytics: AdminAnalyticsSummary) {
                 valueText = "${analytics.totalTicketsSold}",
                 subtitle = "${analytics.regularTicketsCount} Reg • ${analytics.discountedTicketsCount} Disc",
                 icon = Icons.Default.ConfirmationNumber,
-                highlightPrimary = false,
+                badgeColor = TransitTeal,
+                badgeIconTint = DeepNavy,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -373,11 +475,12 @@ private fun KpiSummaryGrid(analytics: AdminAnalyticsSummary) {
             horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus)
         ) {
             KpiStatCard(
-                title = "Discounted Share",
+                title = "Discounted",
                 valueText = String.format(Locale.US, "%.1f%%", analytics.discountedSharePercent),
                 subtitle = "20% Student / Senior / PWD",
                 icon = Icons.Default.Discount,
-                highlightPrimary = false,
+                badgeColor = MaterialTheme.colorScheme.secondaryContainer,
+                badgeIconTint = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.weight(1f)
             )
             KpiStatCard(
@@ -385,7 +488,8 @@ private fun KpiSummaryGrid(analytics: AdminAnalyticsSummary) {
                 valueText = String.format(Locale.US, "%.1f%%", analytics.averageLoadFactorPercent),
                 subtitle = "${analytics.activeTripsCount} active ${if (analytics.activeTripsCount == 1) "trip" else "trips"}",
                 icon = Icons.Default.EventSeat,
-                highlightPrimary = false,
+                badgeColor = MaterialTheme.colorScheme.primaryContainer,
+                badgeIconTint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -398,73 +502,67 @@ private fun KpiStatCard(
     valueText: String,
     subtitle: String,
     icon: ImageVector,
-    highlightPrimary: Boolean,
+    badgeColor: Color,
+    badgeIconTint: Color,
     modifier: Modifier = Modifier
 ) {
-    val containerColor = if (highlightPrimary) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-    val contentColor = if (highlightPrimary) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurface
-    }
-    val subtitleColor = if (highlightPrimary) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
     Card(
         modifier = modifier,
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation),
+        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(AeDimens.SpaceMd),
-            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
+            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus)
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = subtitleColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = if (highlightPrimary) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-                    modifier = Modifier.size(AeDimens.IconSm)
-                )
+                Surface(
+                    modifier = Modifier.size(AeDimens.KpiIconBadgeSize),
+                    shape = CircleShape,
+                    color = badgeColor
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = badgeIconTint,
+                            modifier = Modifier.size(AeDimens.IconSm)
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = valueText,
+                        style = TabularAmountStyle.copy(
+                            fontSize = MaterialTheme.typography.titleLarge.fontSize,
+                            lineHeight = MaterialTheme.typography.titleLarge.lineHeight
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
-            Text(
-                text = valueText,
-                style = TabularAmountStyle.copy(
-                    fontSize = MaterialTheme.typography.headlineSmall.fontSize
-                ),
-                color = contentColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = subtitleColor,
+                style = TabularLabelStyle.merge(MaterialTheme.typography.bodySmall),
+                color = MaterialTheme.colorScheme.secondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -479,9 +577,10 @@ private fun RevenueChartCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.ElevatedCardElevation),
+        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -494,63 +593,83 @@ private fun RevenueChartCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Daily Revenue Trend",
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "Revenue Over Time",
+                        style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Gross fare collections ($rangeLabel)",
+                        text = "Gross fare collections",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Icon(
-                    imageVector = Icons.Default.Analytics,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(
+                        AeDimens.BorderWidth,
+                        MaterialTheme.colorScheme.outlineVariant
+                    )
+                ) {
+                    Text(
+                        text = rangeLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(
+                            horizontal = AeDimens.SpaceSmPlus,
+                            vertical = AeDimens.SpaceXs
+                        )
+                    )
+                }
             }
 
             if (points.isEmpty()) {
-                Surface(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(AeDimens.ChartHeight),
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.surfaceVariant
+                        .padding(vertical = AeDimens.SpaceMd),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.empty_analytics_data),
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(AeDimens.EmptyIllustrationSize)
+                    )
+                    Text(
+                        text = "No revenue recorded in $rangeLabel",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "Issued conductor tickets will automatically populate this chart.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
                 ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(AeDimens.SpaceMd),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Analytics,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(AeDimens.IconLg)
-                            )
-                            Text(
-                                text = "No revenue recorded in $rangeLabel",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Issued conductor tickets will automatically populate this chart.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                            .size(AeDimens.StatusDotSize)
+                            .clip(CircleShape)
+                            .background(ElectricBlue)
+                    )
+                    Text(
+                        text = "Daily Gross Fare Revenue (₱)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-            } else {
+
                 val chartModel = remember(points) {
                     CartesianChartModel(
                         ColumnCartesianLayerModel.build {
@@ -604,9 +723,10 @@ private fun DestinationsAndPassengerBreakdownCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation),
+        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -634,12 +754,12 @@ private fun DestinationsAndPassengerBreakdownCard(
                 ) {
                     Text(
                         text = "Regular: ${analytics.regularTicketsCount}",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = TabularLabelStyle.merge(MaterialTheme.typography.labelMedium),
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
                         text = "Discounted (-20%): ${analytics.discountedTicketsCount}",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = TabularLabelStyle.merge(MaterialTheme.typography.labelMedium),
                         color = MaterialTheme.colorScheme.secondary
                     )
                 }
@@ -647,10 +767,11 @@ private fun DestinationsAndPassengerBreakdownCard(
                     progress = { regularRatio },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(AeDimens.LinearBarHeight),
-                    color = MaterialTheme.colorScheme.primary,
+                        .height(AeDimens.LinearBarHeight)
+                        .clip(CircleShape),
+                    color = ElectricBlue,
                     trackColor = if (analytics.totalTicketsSold > 0) {
-                        MaterialTheme.colorScheme.secondaryContainer
+                        TransitTeal
                     } else {
                         MaterialTheme.colorScheme.surfaceVariant
                     }
@@ -704,7 +825,9 @@ private fun DestinationRankRow(
                 ) {
                     Text(
                         text = "#$rank",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = TabularAmountStyle.copy(
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize
+                        ),
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(
                             horizontal = AeDimens.SpaceSm,
@@ -722,7 +845,7 @@ private fun DestinationRankRow(
                     )
                     Text(
                         text = "${stat.ticketCount} ${if (stat.ticketCount == 1) "ticket" else "tickets"} • ${String.format(Locale.US, "%.1f%%", stat.revenueSharePercent)}",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = TabularLabelStyle.merge(MaterialTheme.typography.bodySmall),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -740,8 +863,9 @@ private fun DestinationRankRow(
             progress = { (stat.revenueSharePercent.toFloat() / 100f).coerceIn(0f, 1f) },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(AeDimens.SpaceXs),
-            color = MaterialTheme.colorScheme.secondary,
+                .height(AeDimens.SpaceXs)
+                .clip(CircleShape),
+            color = TransitTeal,
             trackColor = MaterialTheme.colorScheme.surfaceVariant
         )
     }
@@ -753,9 +877,10 @@ private fun ConductorPerformanceCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation),
+        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -787,7 +912,7 @@ private fun ConductorPerformanceCard(
                         )
                         Text(
                             text = "${stat.ticketsIssued} tickets • ${stat.tripsCount} ${if (stat.tripsCount == 1) "trip" else "trips"}",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = TabularLabelStyle.merge(MaterialTheme.typography.bodySmall),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -805,41 +930,143 @@ private fun ConductorPerformanceCard(
 }
 
 @Composable
-private fun AdminActionCard(
-    title: String,
-    subtitle: String,
-    countBadge: String,
-    countLabel: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+private fun AdminOperationsDirectoryCard(
+    ticketsSoldCount: Int,
+    totalStaff: Int,
+    activeConductorsCount: Int,
+    totalBuses: Int,
+    totalRoutes: Int,
+    onOpenReports: () -> Unit,
+    onOpenManageStaff: () -> Unit,
+    onOpenManageBuses: () -> Unit,
+    onOpenManageRoutes: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.ElevatedCardElevation),
+        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "Operations & Administration",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(
+                    start = AeDimens.SpaceMd,
+                    end = AeDimens.SpaceMd,
+                    top = AeDimens.SpaceMd,
+                    bottom = AeDimens.SpaceXs
+                )
+            )
+
+            AdminDirectoryRow(
+                title = "Reports",
+                subtitle = "CSV & PDF trip & fare exports",
+                badgeValue = "$ticketsSoldCount",
+                icon = Icons.Default.Assessment,
+                iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                onClick = onOpenReports
+            )
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant,
+                modifier = Modifier.padding(horizontal = AeDimens.SpaceMd)
+            )
+            AdminDirectoryRow(
+                title = "Staff",
+                subtitle = "$activeConductorsCount active conductors on roster",
+                badgeValue = "$totalStaff",
+                icon = Icons.Default.Badge,
+                iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                iconTint = MaterialTheme.colorScheme.primary,
+                onClick = onOpenManageStaff
+            )
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant,
+                modifier = Modifier.padding(horizontal = AeDimens.SpaceMd)
+            )
+            AdminDirectoryRow(
+                title = "Buses",
+                subtitle = "Fleet numbers, plates, and 2x2 / 2x3 layouts",
+                badgeValue = "$totalBuses",
+                icon = Icons.Default.DirectionsBus,
+                iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                onClick = onOpenManageBuses
+            )
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant,
+                modifier = Modifier.padding(horizontal = AeDimens.SpaceMd)
+            )
+            AdminDirectoryRow(
+                title = "Routes",
+                subtitle = "Corridors, base fares, and stop matrices",
+                badgeValue = "$totalRoutes",
+                icon = Icons.Default.Route,
+                iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                iconTint = MaterialTheme.colorScheme.primary,
+                onClick = onOpenManageRoutes
+            )
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant,
+                modifier = Modifier.padding(horizontal = AeDimens.SpaceMd)
+            )
+            AdminDirectoryRow(
+                title = "Sync & Settings",
+                subtitle = "Offline queue & cloud sync controls",
+                badgeValue = null,
+                icon = Icons.Default.Settings,
+                iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
+                onClick = onOpenSettings
+            )
+        }
+    }
+}
+
+@Composable
+private fun AdminDirectoryRow(
+    title: String,
+    subtitle: String,
+    badgeValue: String?,
+    icon: ImageVector,
+    iconContainerColor: Color,
+    iconTint: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        color = Color.Transparent,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = AeDimens.PrimaryButtonHeight)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(AeDimens.SpaceMd),
+                .padding(
+                    horizontal = AeDimens.SpaceMd,
+                    vertical = AeDimens.SpaceSmPlus
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceMd)
         ) {
             Surface(
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.primaryContainer
+                modifier = Modifier.size(AeDimens.ActionRowIconBadgeSize),
+                shape = MaterialTheme.shapes.small,
+                color = iconContainerColor
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier
-                        .padding(AeDimens.SpaceSm)
-                        .size(AeDimens.IconLg)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(AeDimens.IconSm)
+                    )
+                }
             }
 
             Column(modifier = Modifier.weight(1f)) {
@@ -848,31 +1075,36 @@ private fun AdminActionCard(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(AeDimens.SpaceXs))
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = countBadge,
-                    style = TabularAmountStyle.copy(
-                        fontSize = MaterialTheme.typography.titleLarge.fontSize
-                    ),
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = countLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            if (badgeValue != null) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Text(
+                        text = badgeValue,
+                        style = TabularAmountStyle.copy(
+                            fontSize = MaterialTheme.typography.labelLarge.fontSize
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(
+                            horizontal = AeDimens.SpaceSmPlus,
+                            vertical = AeDimens.SpaceXxs
+                        )
+                    )
+                }
             }
 
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -898,28 +1130,30 @@ private fun AdminDashboardContentPreview() {
                 activeConductorsCount = 4,
                 analytics = AdminAnalyticsSummary(
                     dateRange = AnalyticsDateRange.LAST_7_DAYS,
-                    totalRevenue = 18_450.0,
-                    totalTicketsSold = 96,
-                    regularTicketsCount = 72,
-                    discountedTicketsCount = 24,
-                    discountedSharePercent = 25.0,
+                    totalRevenue = 42_680.0,
+                    totalTicketsSold = 248,
+                    regularTicketsCount = 182,
+                    discountedTicketsCount = 66,
+                    discountedSharePercent = 26.5,
                     activeTripsCount = 2,
-                    averageLoadFactorPercent = 68.9,
+                    averageLoadFactorPercent = 74.0,
                     dailyRevenuePoints = listOf(
-                        DailyRevenuePoint(1L, "Nov 22", 3200.0, 18),
-                        DailyRevenuePoint(2L, "Nov 23", 4150.0, 21),
-                        DailyRevenuePoint(3L, "Nov 24", 2900.0, 15),
-                        DailyRevenuePoint(4L, "Nov 25", 3850.0, 20),
-                        DailyRevenuePoint(5L, "Nov 26", 4350.0, 22)
+                        DailyRevenuePoint(1L, "Mon", 5200.0, 32),
+                        DailyRevenuePoint(2L, "Tue", 6850.0, 41),
+                        DailyRevenuePoint(3L, "Wed", 4900.0, 29),
+                        DailyRevenuePoint(4L, "Thu", 6150.0, 36),
+                        DailyRevenuePoint(5L, "Fri", 7400.0, 44),
+                        DailyRevenuePoint(6L, "Sat", 5980.0, 33),
+                        DailyRevenuePoint(7L, "Sun", 6200.0, 33)
                     ),
                     topDestinations = listOf(
-                        DestinationRevenueStat("Baguio", 34, 9_800.0, 53.1),
-                        DestinationRevenueStat("Tarlac Junction", 38, 5_450.0, 29.5),
-                        DestinationRevenueStat("Dau", 24, 3_200.0, 17.4)
+                        DestinationRevenueStat("Baguio", 84, 21_800.0, 51.1),
+                        DestinationRevenueStat("Tarlac Junction", 92, 12_450.0, 29.2),
+                        DestinationRevenueStat("Dau", 72, 8_430.0, 19.7)
                     ),
                     conductorSummaries = listOf(
-                        ConductorPerformanceStat("c1", "Ramon Magsaysay", 54, 10_400.0, 4),
-                        ConductorPerformanceStat("c2", "Juan Luna", 42, 8_050.0, 3)
+                        ConductorPerformanceStat("c1", "Ramon Magsaysay", 134, 24_400.0, 6),
+                        ConductorPerformanceStat("c2", "Juan Luna", 114, 18_280.0, 5)
                     )
                 )
             ),

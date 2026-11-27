@@ -17,10 +17,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -41,6 +43,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -79,7 +82,12 @@ import com.aedev.aetranzit.domain.model.UserRole
 import com.aedev.aetranzit.ui.components.AePrimaryButton
 import com.aedev.aetranzit.ui.theme.AeDimens
 import com.aedev.aetranzit.ui.theme.AeTranzitTheme
+import com.aedev.aetranzit.ui.theme.DeepNavy
+import com.aedev.aetranzit.ui.theme.ElectricBlue
+import com.aedev.aetranzit.ui.theme.NavySubtleText
+import com.aedev.aetranzit.ui.theme.PureWhite
 import com.aedev.aetranzit.ui.theme.TabularAmountStyle
+import com.aedev.aetranzit.ui.theme.TransitTealDark
 
 @Composable
 fun ManageStaffScreen(
@@ -140,6 +148,7 @@ fun ManageStaffContent(
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
@@ -160,7 +169,10 @@ fun ManageStaffContent(
                 navigationIcon = {
                     IconButton(
                         onClick = onNavigateBack,
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                        modifier = Modifier.sizeIn(
+                            minWidth = AeDimens.MinTouchTarget,
+                            minHeight = AeDimens.MinTouchTarget
+                        )
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -173,6 +185,9 @@ fun ManageStaffContent(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onOpenAddStaff,
+                containerColor = ElectricBlue,
+                contentColor = PureWhite,
+                shape = CircleShape,
                 icon = {
                     Icon(
                         imageVector = Icons.Default.PersonAdd,
@@ -197,7 +212,7 @@ fun ManageStaffContent(
                 start = AeDimens.SpaceMd,
                 top = AeDimens.SpaceMd,
                 end = AeDimens.SpaceMd,
-                bottom = AeDimens.PrimaryButtonHeight + AeDimens.SpaceXl
+                bottom = AeDimens.FabBottomClearance
             ),
             verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceMd)
         ) {
@@ -220,7 +235,8 @@ fun ManageStaffContent(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
                     ) {
                         Column(
                             modifier = Modifier
@@ -260,7 +276,10 @@ fun ManageStaffContent(
     }
 
     if (uiState.addStaffForm.isSheetVisible) {
-        ModalBottomSheet(onDismissRequest = onDismissAddStaff) {
+        ModalBottomSheet(
+            onDismissRequest = onDismissAddStaff,
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
             AddStaffSheetContent(
                 formState = uiState.addStaffForm,
                 companyName = uiState.companyName,
@@ -353,6 +372,7 @@ private fun AddStaffSheetContent(
             label = { Text("Full Name") },
             placeholder = { Text("e.g., Ramon Magsaysay") },
             leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+            shape = MaterialTheme.shapes.medium,
             isError = formState.nameError != null,
             supportingText = formState.nameError?.let { err -> { Text(err) } },
             singleLine = true,
@@ -369,6 +389,7 @@ private fun AddStaffSheetContent(
             label = { Text("Email Address") },
             placeholder = { Text("e.g., ramon@buscompany.ph") },
             leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+            shape = MaterialTheme.shapes.medium,
             isError = formState.emailError != null,
             supportingText = formState.emailError?.let { err -> { Text(err) } },
             singleLine = true,
@@ -389,10 +410,14 @@ private fun AddStaffSheetContent(
                 onValueChange = onTempPasswordChanged,
                 label = { Text("Temporary Password") },
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                shape = MaterialTheme.shapes.medium,
                 trailingIcon = {
                     IconButton(
                         onClick = onToggleTempPasswordVisibility,
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                        modifier = Modifier.sizeIn(
+                            minWidth = AeDimens.MinTouchTarget,
+                            minHeight = AeDimens.MinTouchTarget
+                        )
                     ) {
                         Icon(
                             imageVector = if (formState.isPasswordVisible) {
@@ -485,24 +510,24 @@ private fun StaffRoleChip(
     modifier: Modifier = Modifier
 ) {
     val containerColor = if (selected) {
-        MaterialTheme.colorScheme.primaryContainer
+        ElectricBlue
     } else {
         MaterialTheme.colorScheme.surfaceVariant
     }
     val contentColor = if (selected) {
-        MaterialTheme.colorScheme.onPrimaryContainer
+        PureWhite
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
     val border = if (selected) {
-        BorderStroke(AeDimens.BorderWidthThick, MaterialTheme.colorScheme.primary)
+        null
     } else {
-        BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outline)
+        BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
     }
 
     Surface(
         onClick = onClick,
-        shape = MaterialTheme.shapes.medium,
+        shape = CircleShape,
         color = containerColor,
         contentColor = contentColor,
         border = border,
@@ -521,7 +546,8 @@ private fun StaffRoleChip(
                 } else {
                     Icons.Default.Badge
                 },
-                contentDescription = null
+                contentDescription = null,
+                modifier = Modifier.size(AeDimens.IconSm)
             )
             Spacer(modifier = Modifier.width(AeDimens.SpaceSm))
             Text(
@@ -590,6 +616,11 @@ private fun ProvisionedCredentialsDialog(
         confirmButton = {
             Button(
                 onClick = onCopyCredentials,
+                shape = CircleShape,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ElectricBlue,
+                    contentColor = PureWhite
+                ),
                 modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
             ) {
                 Icon(
@@ -646,20 +677,32 @@ private fun CredentialLine(
 private fun StaffSummaryCard(uiState: ManageStaffUiState) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = DeepNavy),
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.ElevatedCardElevation)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(AeDimens.SpaceMd),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            StaffStatColumn(label = "Admins", value = "${uiState.totalAdmins}")
-            StaffStatColumn(label = "Conductors", value = "${uiState.totalConductors}")
-            StaffStatColumn(label = "Active Staff", value = "${uiState.activeCount}")
+            StaffStatColumn(
+                label = "Admins",
+                value = "${uiState.totalAdmins}",
+                highlightTeal = false
+            )
+            StaffStatColumn(
+                label = "Conductors",
+                value = "${uiState.totalConductors}",
+                highlightTeal = false
+            )
+            StaffStatColumn(
+                label = "Active Staff",
+                value = "${uiState.activeCount}",
+                highlightTeal = true
+            )
         }
     }
 }
@@ -667,7 +710,8 @@ private fun StaffSummaryCard(uiState: ManageStaffUiState) {
 @Composable
 private fun StaffStatColumn(
     label: String,
-    value: String
+    value: String,
+    highlightTeal: Boolean
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
@@ -675,12 +719,12 @@ private fun StaffStatColumn(
             style = TabularAmountStyle.copy(
                 fontSize = MaterialTheme.typography.headlineSmall.fontSize
             ),
-            color = MaterialTheme.colorScheme.onPrimaryContainer
+            color = if (highlightTeal) TransitTealDark else PureWhite
         )
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onPrimaryContainer
+            color = NavySubtleText
         )
     }
 }
@@ -722,7 +766,10 @@ private fun StaffFeedbackBanner(
             )
             IconButton(
                 onClick = onDismiss,
-                modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                modifier = Modifier.sizeIn(
+                    minWidth = AeDimens.MinTouchTarget,
+                    minHeight = AeDimens.MinTouchTarget
+                )
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
@@ -744,7 +791,8 @@ private fun StaffMemberCard(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation),
+        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -771,7 +819,7 @@ private fun StaffMemberCard(
                         )
                         if (member.isCurrentUser) {
                             Surface(
-                                shape = MaterialTheme.shapes.small,
+                                shape = CircleShape,
                                 color = MaterialTheme.colorScheme.tertiaryContainer
                             ) {
                                 Text(
@@ -797,7 +845,10 @@ private fun StaffMemberCard(
                 }
 
                 Box(
-                    modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget),
+                    modifier = Modifier.sizeIn(
+                        minWidth = AeDimens.MinTouchTarget,
+                        minHeight = AeDimens.MinTouchTarget
+                    ),
                     contentAlignment = Alignment.Center
                 ) {
                     Switch(
@@ -865,7 +916,7 @@ private fun StaffMemberCard(
 @Composable
 private fun TempPasswordBadge() {
     Surface(
-        shape = MaterialTheme.shapes.small,
+        shape = CircleShape,
         color = MaterialTheme.colorScheme.tertiaryContainer
     ) {
         Text(
@@ -884,7 +935,7 @@ private fun TempPasswordBadge() {
 private fun RoleBadge(role: UserRole) {
     val isAdmin = role == UserRole.ADMIN
     Surface(
-        shape = MaterialTheme.shapes.small,
+        shape = CircleShape,
         color = if (isAdmin) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
@@ -925,7 +976,7 @@ private fun RoleBadge(role: UserRole) {
 @Composable
 private fun ActiveStatusBadge(isActive: Boolean) {
     Surface(
-        shape = MaterialTheme.shapes.small,
+        shape = CircleShape,
         color = if (isActive) {
             MaterialTheme.colorScheme.secondaryContainer
         } else {

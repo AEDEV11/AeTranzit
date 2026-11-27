@@ -1,6 +1,10 @@
 package com.aedev.aetranzit.ui.conductor
 
+import android.content.res.Configuration
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,16 +19,18 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.DirectionsBus
@@ -32,6 +38,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EventSeat
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -48,25 +55,33 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aedev.aetranzit.R
 import com.aedev.aetranzit.domain.model.Bus
 import com.aedev.aetranzit.domain.model.PassengerType
 import com.aedev.aetranzit.domain.model.Route
@@ -76,13 +91,25 @@ import com.aedev.aetranzit.domain.model.TicketStatus
 import com.aedev.aetranzit.domain.model.Trip
 import com.aedev.aetranzit.domain.model.TripStatus
 import com.aedev.aetranzit.domain.usecase.FareCalculationResult
+import com.aedev.aetranzit.ui.components.AeEmptyStateCard
 import com.aedev.aetranzit.ui.components.AePrimaryButton
 import com.aedev.aetranzit.ui.components.SyncBadgeUiState
 import com.aedev.aetranzit.ui.components.SyncStatusBadge
 import com.aedev.aetranzit.ui.components.formatPhp
 import com.aedev.aetranzit.ui.theme.AeDimens
 import com.aedev.aetranzit.ui.theme.AeTranzitTheme
+import com.aedev.aetranzit.ui.theme.DeepNavy
+import com.aedev.aetranzit.ui.theme.ElectricBlue
+import com.aedev.aetranzit.ui.theme.ElectricBlueDark
+import com.aedev.aetranzit.ui.theme.HeroHeaderBottomShape
+import com.aedev.aetranzit.ui.theme.NavyHeaderBorder
+import com.aedev.aetranzit.ui.theme.NavyHeaderSurface
+import com.aedev.aetranzit.ui.theme.NavySubtleText
+import com.aedev.aetranzit.ui.theme.PureWhite
 import com.aedev.aetranzit.ui.theme.TabularAmountStyle
+import com.aedev.aetranzit.ui.theme.TabularLabelStyle
+import com.aedev.aetranzit.ui.theme.TransitTeal
+import com.aedev.aetranzit.ui.theme.TransitTealDark
 import java.text.DateFormat
 import java.util.Date
 
@@ -180,6 +207,7 @@ fun ConductorTicketingContent(
     onOpenSettings: (() -> Unit)? = null
 ) {
     val bus = uiState.bus
+    val route = uiState.route
     val columns = if (bus?.columns == 5) 5 else 4
     val seatRows = remember(uiState.totalSeats, columns) {
         if (uiState.totalSeats <= 0) {
@@ -188,49 +216,46 @@ fun ConductorTicketingContent(
             (1..uiState.totalSeats).map { it.toString() }.chunked(columns)
         }
     }
+    val sortedActiveTickets = remember(uiState.activeTicketsBySeat) {
+        uiState.activeTicketsBySeat.values.sortedWith(
+            compareBy({ it.seatNumber.toIntOrNull() ?: Int.MAX_VALUE }, { it.seatNumber })
+        )
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Seat Map & Ticketing",
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (uiState.route != null) {
-                            Text(
-                                text = uiState.route.displayName,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+            if (uiState.trip != null && bus != null && route != null) {
+                TripSummaryHeroHeader(
+                    bus = bus,
+                    route = route,
+                    occupiedSeatsCount = uiState.occupiedSeatsCount,
+                    totalSeats = uiState.totalSeats,
+                    totalCollection = uiState.totalTripCollection,
+                    syncBadgeState = syncBadgeState,
+                    onNavigateBack = onNavigateBack,
+                    onOpenSettings = onOpenSettings
+                )
+            } else {
+                TopAppBar(
+                    title = { Text("Seat Map & Ticketing") },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = onNavigateBack,
+                            modifier = Modifier.sizeIn(
+                                minWidth = AeDimens.MinTouchTarget,
+                                minHeight = AeDimens.MinTouchTarget
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back"
                             )
                         }
                     }
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = onNavigateBack,
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                actions = {
-                    SyncStatusBadge(
-                        state = syncBadgeState,
-                        onClick = onOpenSettings,
-                        modifier = Modifier.padding(end = AeDimens.SpaceSm)
-                    )
-                }
-            )
+                )
+            }
         }
     ) { innerPadding ->
         when {
@@ -245,7 +270,7 @@ fun ConductorTicketingContent(
                 }
             }
 
-            uiState.trip == null || bus == null || uiState.route == null -> {
+            uiState.trip == null || bus == null || route == null -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -253,44 +278,13 @@ fun ConductorTicketingContent(
                         .padding(AeDimens.SpaceMd),
                     contentAlignment = Alignment.Center
                 ) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(AeDimens.SpaceLg),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceMd)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.DirectionsBus,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(AeDimens.IconLg)
-                            )
-                            Text(
-                                text = "Active Trip Unavailable",
-                                style = MaterialTheme.typography.titleLarge,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = "This trip could not be found or its bus/route metadata is missing.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                            AePrimaryButton(
-                                text = "Return to Shift Console",
-                                onClick = onNavigateBack
-                            )
-                        }
-                    }
+                    AeEmptyStateCard(
+                        illustrationRes = R.drawable.empty_fleet_route,
+                        title = "Active Trip Unavailable",
+                        subtitle = "This trip could not be found or its bus and route metadata is missing.",
+                        actionLabel = "Return to Shift Console",
+                        onActionClick = onNavigateBack
+                    )
                 }
             }
 
@@ -300,18 +294,8 @@ fun ConductorTicketingContent(
                         .fillMaxSize()
                         .padding(innerPadding),
                     contentPadding = PaddingValues(AeDimens.SpaceMd),
-                    verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
+                    verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceMd)
                 ) {
-                    item(key = "trip_summary_bar") {
-                        TripSummaryHeaderCard(
-                            bus = bus,
-                            route = uiState.route,
-                            occupiedSeatsCount = uiState.occupiedSeatsCount,
-                            totalSeats = uiState.totalSeats,
-                            totalCollection = uiState.totalTripCollection
-                        )
-                    }
-
                     if (uiState.statusMessage != null) {
                         item(key = "status_banner") {
                             StatusFeedbackBanner(
@@ -337,16 +321,10 @@ fun ConductorTicketingContent(
                         }
                     }
 
-                    item(key = "seat_map_header") {
-                        SeatMapOrientationHeader(layoutLabel = bus.layoutLabel)
-                    }
-
-                    itemsIndexed(
-                        items = seatRows,
-                        key = { index, _ -> "seat_row_$index" }
-                    ) { _, rowSeats ->
-                        BusSeatRow(
-                            rowSeats = rowSeats,
+                    item(key = "seat_map_card") {
+                        SeatMapContainerCard(
+                            layoutLabel = bus.layoutLabel,
+                            seatRows = seatRows,
                             totalColumns = columns,
                             selectedSeat = uiState.selectedSeatForIssue,
                             activeTicketsBySeat = uiState.activeTicketsBySeat,
@@ -354,6 +332,17 @@ fun ConductorTicketingContent(
                                 onEvent(ConductorTicketingUiEvent.SeatTapped(seat))
                             }
                         )
+                    }
+
+                    if (sortedActiveTickets.isNotEmpty()) {
+                        item(key = "active_seats_manifest") {
+                            ActiveSeatsManifestCard(
+                                tickets = sortedActiveTickets,
+                                onTicketClick = { ticket ->
+                                    onEvent(ConductorTicketingUiEvent.SeatTapped(ticket.seatNumber))
+                                }
+                            )
+                        }
                     }
 
                     item(key = "bottom_spacer") {
@@ -366,20 +355,406 @@ fun ConductorTicketingContent(
 }
 
 @Composable
-private fun TripSummaryHeaderCard(
+private fun TripSummaryHeroHeader(
     bus: Bus,
     route: Route,
     occupiedSeatsCount: Int,
     totalSeats: Int,
-    totalCollection: Double
+    totalCollection: Double,
+    syncBadgeState: SyncBadgeUiState,
+    onNavigateBack: () -> Unit,
+    onOpenSettings: (() -> Unit)?
+) {
+    val availableSeatsCount = (totalSeats - occupiedSeatsCount).coerceAtLeast(0)
+    val dashEffect = remember { PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f) }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = DeepNavy,
+        shape = HeroHeaderBottomShape,
+        shadowElevation = AeDimens.ElevatedCardElevation
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(
+                    start = AeDimens.SpaceMd,
+                    end = AeDimens.SpaceMd,
+                    top = AeDimens.SpaceSm,
+                    bottom = AeDimens.SpaceMd
+                ),
+            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier.sizeIn(
+                            minWidth = AeDimens.MinTouchTarget,
+                            minHeight = AeDimens.MinTouchTarget
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = PureWhite
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "Bus #${bus.busNumber}",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = PureWhite,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = bus.plateNumber,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = NavySubtleText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
+                ) {
+                    SyncStatusBadge(
+                        state = syncBadgeState,
+                        onDarkHeader = true,
+                        onClick = onOpenSettings
+                    )
+                    if (onOpenSettings != null) {
+                        IconButton(
+                            onClick = onOpenSettings,
+                            modifier = Modifier.sizeIn(
+                                minWidth = AeDimens.MinTouchTarget,
+                                minHeight = AeDimens.MinTouchTarget
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = PureWhite
+                            )
+                        }
+                    }
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)) {
+                Text(
+                    text = "${route.origin}  →  ${route.destination}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = PureWhite,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(AeDimens.StatusDotSize)
+                            .clip(CircleShape)
+                            .background(ElectricBlueDark)
+                    )
+                    Canvas(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(AeDimens.BorderWidthThick)
+                    ) {
+                        val centerY = size.height / 2f
+                        drawLine(
+                            color = NavyHeaderBorder,
+                            start = Offset(0f, centerY),
+                            end = Offset(size.width, centerY),
+                            strokeWidth = size.height,
+                            pathEffect = dashEffect
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.DirectionsBus,
+                        contentDescription = null,
+                        tint = TransitTealDark,
+                        modifier = Modifier.size(AeDimens.IconXs)
+                    )
+                    Canvas(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(AeDimens.BorderWidthThick)
+                    ) {
+                        val centerY = size.height / 2f
+                        drawLine(
+                            color = NavyHeaderBorder,
+                            start = Offset(0f, centerY),
+                            end = Offset(size.width, centerY),
+                            strokeWidth = size.height,
+                            pathEffect = dashEffect
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(AeDimens.StatusDotSize)
+                            .clip(CircleShape)
+                            .background(TransitTealDark)
+                    )
+                }
+            }
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                color = NavyHeaderSurface,
+                border = BorderStroke(AeDimens.BorderWidth, NavyHeaderBorder)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = AeDimens.SpaceSmPlus,
+                            vertical = AeDimens.SpaceSmPlus
+                        ),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HeaderMetricCell(
+                        label = "Passengers",
+                        value = "$occupiedSeatsCount/$totalSeats",
+                        valueColor = PureWhite,
+                        modifier = Modifier.weight(1f)
+                    )
+                    HeaderMetricCell(
+                        label = "Seats Available",
+                        value = "$availableSeatsCount/$totalSeats",
+                        valueColor = TransitTealDark,
+                        modifier = Modifier.weight(1f),
+                        align = Alignment.CenterHorizontally
+                    )
+                    HeaderMetricCell(
+                        label = "Layout",
+                        value = bus.layoutLabel,
+                        valueColor = PureWhite,
+                        modifier = Modifier.weight(1f),
+                        align = Alignment.End
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Trip Collection",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = NavySubtleText
+                )
+                Text(
+                    text = formatPhp(totalCollection),
+                    style = TabularAmountStyle.copy(
+                        fontSize = MaterialTheme.typography.headlineMedium.fontSize,
+                        lineHeight = MaterialTheme.typography.headlineMedium.lineHeight
+                    ),
+                    color = PureWhite
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeaderMetricCell(
+    label: String,
+    value: String,
+    valueColor: Color,
+    modifier: Modifier = Modifier,
+    align: Alignment.Horizontal = Alignment.Start
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = align
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = NavySubtleText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = value,
+            style = TabularAmountStyle.copy(
+                fontSize = MaterialTheme.typography.titleMedium.fontSize,
+                lineHeight = MaterialTheme.typography.titleMedium.lineHeight
+            ),
+            color = valueColor,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun SeatMapContainerCard(
+    layoutLabel: String,
+    seatRows: List<List<String>>,
+    totalColumns: Int,
+    selectedSeat: String?,
+    activeTicketsBySeat: Map<String, Ticket>,
+    onSeatClick: (String) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.ElevatedCardElevation),
+        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AeDimens.SpaceMd),
+            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Seat Map",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Tap an open seat to issue • Tap occupied for receipt or drop-off",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.secondary)
+                ) {
+                    Text(
+                        text = layoutLabel,
+                        style = TabularAmountStyle.copy(
+                            fontSize = MaterialTheme.typography.labelMedium.fontSize
+                        ),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(
+                            horizontal = AeDimens.SpaceSmPlus,
+                            vertical = AeDimens.SpaceXs
+                        )
+                    )
+                }
+            }
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Text(
+                    text = "▲  FRONT OF BUS  ($layoutLabel AISLE)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = AeDimens.SpaceXs)
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)) {
+                seatRows.forEach { rowSeats ->
+                    BusSeatRow(
+                        rowSeats = rowSeats,
+                        totalColumns = totalColumns,
+                        selectedSeat = selectedSeat,
+                        activeTicketsBySeat = activeTicketsBySeat,
+                        onSeatClick = onSeatClick
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SeatLegendIndicator(
+                    dotColor = MaterialTheme.colorScheme.outline,
+                    label = "Available"
+                )
+                SeatLegendIndicator(
+                    dotColor = ElectricBlue,
+                    label = "Selected"
+                )
+                SeatLegendIndicator(
+                    dotColor = TransitTeal,
+                    label = "Occupied"
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SeatLegendIndicator(
+    dotColor: Color,
+    label: String
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(AeDimens.StatusDotSize)
+                .clip(CircleShape)
+                .background(dotColor)
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun ActiveSeatsManifestCard(
+    tickets: List<Ticket>,
+    onTicketClick: (Ticket) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation),
+        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -392,83 +767,102 @@ private fun TripSummaryHeaderCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DirectionsBus,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Column {
-                        Text(
-                            text = "Bus #${bus.busNumber} • ${bus.plateNumber}",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            text = "${route.origin} → ${route.destination}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
-
-                Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.surface
-                ) {
-                    Text(
-                        text = "${bus.layoutLabel} Layout",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(
-                            horizontal = AeDimens.SpaceSm,
-                            vertical = AeDimens.SpaceXs
-                        )
-                    )
-                }
+                Text(
+                    text = "Occupied Seats",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "${tickets.size} active",
+                    style = TabularLabelStyle.merge(MaterialTheme.typography.labelMedium),
+                    color = MaterialTheme.colorScheme.secondary
+                )
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "OCCUPIED SEATS",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = "$occupiedSeatsCount / $totalSeats",
-                        style = TabularAmountStyle.copy(
-                            fontSize = MaterialTheme.typography.titleLarge.fontSize,
-                            lineHeight = MaterialTheme.typography.titleLarge.lineHeight
-                        ),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+            tickets.forEachIndexed { index, ticket ->
+                if (index > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
+                Surface(
+                    onClick = { onTicketClick(ticket) },
+                    shape = MaterialTheme.shapes.medium,
+                    color = Color.Transparent,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = AeDimens.MinTouchTarget)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = AeDimens.SpaceXs),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Surface(
+                                shape = MaterialTheme.shapes.small,
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                modifier = Modifier.sizeIn(minWidth = AeDimens.ActionRowIconBadgeSize)
+                            ) {
+                                Text(
+                                    text = "#${ticket.seatNumber}",
+                                    style = TabularAmountStyle.copy(
+                                        fontSize = MaterialTheme.typography.labelLarge.fontSize
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(
+                                        horizontal = AeDimens.SpaceSm,
+                                        vertical = AeDimens.SpaceXs
+                                    )
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = ticket.destination,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = if (ticket.passengerType.isDiscounted) {
+                                        "${ticket.passengerType.displayName} (-20%)"
+                                    } else {
+                                        ticket.passengerType.displayName
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (ticket.passengerType.isDiscounted) {
+                                        MaterialTheme.colorScheme.secondary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                        }
 
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "TRIP COLLECTION",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = formatPhp(totalCollection),
-                        style = TabularAmountStyle.copy(
-                            fontSize = MaterialTheme.typography.titleLarge.fontSize,
-                            lineHeight = MaterialTheme.typography.titleLarge.lineHeight
-                        ),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
+                        ) {
+                            Text(
+                                text = formatPhp(ticket.fareAmount),
+                                style = TabularAmountStyle.copy(
+                                    fontSize = MaterialTheme.typography.titleSmall.fontSize
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -512,7 +906,10 @@ private fun StatusFeedbackBanner(
             )
             IconButton(
                 onClick = onDismiss,
-                modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                modifier = Modifier.sizeIn(
+                    minWidth = AeDimens.MinTouchTarget,
+                    minHeight = AeDimens.MinTouchTarget
+                )
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
@@ -551,7 +948,8 @@ private fun IssuedTicketConfirmationCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
+                    horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm),
+                    modifier = Modifier.weight(1f)
                 ) {
                     Icon(
                         imageVector = Icons.Default.ConfirmationNumber,
@@ -573,7 +971,10 @@ private fun IssuedTicketConfirmationCard(
                 }
                 IconButton(
                     onClick = onDismiss,
-                    modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                    modifier = Modifier.sizeIn(
+                        minWidth = AeDimens.MinTouchTarget,
+                        minHeight = AeDimens.MinTouchTarget
+                    )
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
@@ -609,113 +1010,6 @@ private fun IssuedTicketConfirmationCard(
                     Text("View Digital Ticket")
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun SeatMapOrientationHeader(layoutLabel: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outline)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(AeDimens.SpaceMd),
-            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Tap an open seat to issue • Tap an occupied seat for details/drop-off",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SeatLegendBadge(
-                    icon = Icons.Default.EventSeat,
-                    label = "Available",
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    borderColor = MaterialTheme.colorScheme.outline
-                )
-                SeatLegendBadge(
-                    icon = Icons.Default.CheckCircle,
-                    label = "Selected",
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    borderColor = MaterialTheme.colorScheme.primary
-                )
-                SeatLegendBadge(
-                    icon = Icons.Default.Person,
-                    label = "Occupied",
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    borderColor = MaterialTheme.colorScheme.secondary
-                )
-            }
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.small,
-                color = MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Text(
-                    text = "▲ FRONT OF BUS ($layoutLabel AISLE LAYOUT)",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = AeDimens.SpaceXs)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SeatLegendBadge(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    containerColor: androidx.compose.ui.graphics.Color,
-    contentColor: androidx.compose.ui.graphics.Color,
-    borderColor: androidx.compose.ui.graphics.Color
-) {
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color = containerColor,
-        border = BorderStroke(AeDimens.BorderWidth, borderColor)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = AeDimens.SpaceSm, vertical = AeDimens.SpaceXs),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.size(AeDimens.IconXs)
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = contentColor
-            )
         }
     }
 }
@@ -768,18 +1062,23 @@ private fun SeatTile(
     modifier: Modifier = Modifier
 ) {
     val containerColor = when (visualState) {
-        SeatVisualState.AVAILABLE -> MaterialTheme.colorScheme.surface
-        SeatVisualState.SELECTED -> MaterialTheme.colorScheme.primaryContainer
+        SeatVisualState.AVAILABLE -> MaterialTheme.colorScheme.surfaceVariant
+        SeatVisualState.SELECTED -> ElectricBlue
         SeatVisualState.OCCUPIED -> MaterialTheme.colorScheme.secondaryContainer
     }
     val contentColor = when (visualState) {
         SeatVisualState.AVAILABLE -> MaterialTheme.colorScheme.onSurface
-        SeatVisualState.SELECTED -> MaterialTheme.colorScheme.onPrimaryContainer
+        SeatVisualState.SELECTED -> PureWhite
+        SeatVisualState.OCCUPIED -> MaterialTheme.colorScheme.onSecondaryContainer
+    }
+    val subtitleColor = when (visualState) {
+        SeatVisualState.AVAILABLE -> MaterialTheme.colorScheme.onSurfaceVariant
+        SeatVisualState.SELECTED -> PureWhite
         SeatVisualState.OCCUPIED -> MaterialTheme.colorScheme.onSecondaryContainer
     }
     val borderColor = when (visualState) {
-        SeatVisualState.AVAILABLE -> MaterialTheme.colorScheme.outline
-        SeatVisualState.SELECTED -> MaterialTheme.colorScheme.primary
+        SeatVisualState.AVAILABLE -> MaterialTheme.colorScheme.outlineVariant
+        SeatVisualState.SELECTED -> ElectricBlue
         SeatVisualState.OCCUPIED -> MaterialTheme.colorScheme.secondary
     }
     val borderWidth = if (visualState == SeatVisualState.SELECTED) {
@@ -787,10 +1086,10 @@ private fun SeatTile(
     } else {
         AeDimens.BorderWidth
     }
-    val icon = when (visualState) {
-        SeatVisualState.AVAILABLE -> Icons.Default.EventSeat
-        SeatVisualState.SELECTED -> Icons.Default.CheckCircle
-        SeatVisualState.OCCUPIED -> Icons.Default.Person
+    val seatDrawableRes = when (visualState) {
+        SeatVisualState.AVAILABLE -> R.drawable.ic_seat_available
+        SeatVisualState.SELECTED -> R.drawable.ic_seat_selected
+        SeatVisualState.OCCUPIED -> R.drawable.ic_seat_occupied
     }
     val subtitle = when (visualState) {
         SeatVisualState.AVAILABLE -> "Open"
@@ -815,34 +1114,37 @@ private fun SeatTile(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = AeDimens.SpaceXs, vertical = AeDimens.SpaceSm),
+                .padding(horizontal = AeDimens.SpaceXs, vertical = AeDimens.SpaceXs),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)
-            ) {
-                Icon(
-                    imageVector = icon,
+            Box(contentAlignment = Alignment.Center) {
+                Image(
+                    painter = painterResource(id = seatDrawableRes),
                     contentDescription = null,
-                    tint = contentColor,
-                    modifier = Modifier.size(AeDimens.IconXs)
-                )
-                Text(
-                    text = seatNumber,
-                    style = TabularAmountStyle.copy(
-                        fontSize = MaterialTheme.typography.titleSmall.fontSize,
-                        lineHeight = MaterialTheme.typography.titleSmall.lineHeight
-                    ),
-                    color = contentColor,
-                    maxLines = 1
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(AeDimens.SeatArtworkSize)
                 )
             }
             Text(
-                text = subtitle,
-                style = MaterialTheme.typography.labelSmall,
+                text = seatNumber,
+                style = TabularAmountStyle.copy(
+                    fontSize = MaterialTheme.typography.titleSmall.fontSize,
+                    lineHeight = MaterialTheme.typography.titleSmall.lineHeight
+                ),
                 color = contentColor,
+                maxLines = 1
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = if (visualState == SeatVisualState.SELECTED) {
+                        FontWeight.Bold
+                    } else {
+                        FontWeight.Medium
+                    }
+                ),
+                color = subtitleColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center
@@ -875,7 +1177,6 @@ fun IssueTicketSheetContent(
             .padding(horizontal = AeDimens.SpaceMd, vertical = AeDimens.SpaceSm),
         verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceMd)
     ) {
-        // Seat Badge Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -887,7 +1188,7 @@ fun IssueTicketSheetContent(
             ) {
                 Surface(
                     shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.primaryContainer
+                    color = ElectricBlue
                 ) {
                     Row(
                         modifier = Modifier.padding(
@@ -900,13 +1201,15 @@ fun IssueTicketSheetContent(
                         Icon(
                             imageVector = Icons.Default.EventSeat,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            tint = PureWhite,
                             modifier = Modifier.size(AeDimens.IconSm)
                         )
                         Text(
                             text = "Seat #$seatNumber",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            style = TabularAmountStyle.copy(
+                                fontSize = MaterialTheme.typography.titleMedium.fontSize
+                            ),
+                            color = PureWhite
                         )
                     }
                 }
@@ -927,7 +1230,10 @@ fun IssueTicketSheetContent(
 
             IconButton(
                 onClick = { onEvent(ConductorTicketingUiEvent.DismissIssueSheet) },
-                modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                modifier = Modifier.sizeIn(
+                    minWidth = AeDimens.MinTouchTarget,
+                    minHeight = AeDimens.MinTouchTarget
+                )
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
@@ -936,7 +1242,6 @@ fun IssueTicketSheetContent(
             }
         }
 
-        // 1. Destination Selector
         Column(verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)) {
             Text(
                 text = "1. Destination",
@@ -955,7 +1260,7 @@ fun IssueTicketSheetContent(
                         label = {
                             Text(
                                 text = "${option.name} (${formatPhp(option.fare)})",
-                                style = MaterialTheme.typography.labelLarge
+                                style = TabularLabelStyle.merge(MaterialTheme.typography.labelLarge)
                             )
                         },
                         modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
@@ -964,7 +1269,6 @@ fun IssueTicketSheetContent(
             }
         }
 
-        // 2. Passenger Type Selector
         Column(verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceXs)) {
             Text(
                 text = "2. Passenger Type",
@@ -991,13 +1295,13 @@ fun IssueTicketSheetContent(
             }
         }
 
-        // 3. Calculated Fare & Optional Manual Override
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium,
+            shape = MaterialTheme.shapes.large,
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+            ),
+            border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Column(
                 modifier = Modifier
@@ -1027,7 +1331,7 @@ fun IssueTicketSheetContent(
                         if (fareCalculation.discountAmount > 0.0 && !fareCalculation.isManualOverride) {
                             Text(
                                 text = "20% ${selectedPassengerType.displayName} discount applied (-${formatPhp(fareCalculation.discountAmount)})",
-                                style = MaterialTheme.typography.bodySmall,
+                                style = TabularLabelStyle.merge(MaterialTheme.typography.bodySmall),
                                 color = MaterialTheme.colorScheme.secondary
                             )
                         } else if (fareCalculation.isManualOverride) {
@@ -1066,6 +1370,7 @@ fun IssueTicketSheetContent(
                         onValueChange = { onEvent(ConductorTicketingUiEvent.ManualFareChanged(it)) },
                         label = { Text("Custom Fare Amount (₱)") },
                         placeholder = { Text("e.g. 120.00") },
+                        shape = MaterialTheme.shapes.medium,
                         singleLine = true,
                         textStyle = TabularAmountStyle.copy(
                             fontSize = MaterialTheme.typography.bodyLarge.fontSize
@@ -1077,7 +1382,6 @@ fun IssueTicketSheetContent(
             }
         }
 
-        // 4. Cash Tendered & Change Calculator
         Column(verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)) {
             Text(
                 text = "3. Cash Tendered & Change",
@@ -1089,6 +1393,7 @@ fun IssueTicketSheetContent(
                 onValueChange = { onEvent(ConductorTicketingUiEvent.CashTenderedChanged(it)) },
                 label = { Text("Cash Tendered (₱)") },
                 placeholder = { Text("Tap Exact / quick bill or type amount") },
+                shape = MaterialTheme.shapes.medium,
                 singleLine = true,
                 isError = fareCalculation.isInsufficientCash,
                 textStyle = TabularAmountStyle.copy(
@@ -1121,7 +1426,9 @@ fun IssueTicketSheetContent(
                         label = {
                             Text(
                                 text = "₱${bill.toInt()}",
-                                style = MaterialTheme.typography.labelLarge
+                                style = TabularAmountStyle.copy(
+                                    fontSize = MaterialTheme.typography.labelLarge.fontSize
+                                )
                             )
                         },
                         modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
@@ -1129,7 +1436,6 @@ fun IssueTicketSheetContent(
                 }
             }
 
-            // Live Change / Insufficient Cash Warning Box
             when {
                 fareCalculation.isInsufficientCash -> {
                     Surface(
@@ -1171,7 +1477,8 @@ fun IssueTicketSheetContent(
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.medium,
-                        color = MaterialTheme.colorScheme.secondaryContainer
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.secondary)
                     ) {
                         Row(
                             modifier = Modifier
@@ -1247,7 +1554,8 @@ fun OccupiedSeatDetailsSheetContent(
             ) {
                 Surface(
                     shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.secondaryContainer
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.secondary)
                 ) {
                     Row(
                         modifier = Modifier.padding(
@@ -1265,7 +1573,9 @@ fun OccupiedSeatDetailsSheetContent(
                         )
                         Text(
                             text = "Seat #${ticket.seatNumber}",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = TabularAmountStyle.copy(
+                                fontSize = MaterialTheme.typography.titleMedium.fontSize
+                            ),
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     }
@@ -1285,7 +1595,10 @@ fun OccupiedSeatDetailsSheetContent(
 
             IconButton(
                 onClick = { onEvent(ConductorTicketingUiEvent.DismissInspectedTicket) },
-                modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                modifier = Modifier.sizeIn(
+                    minWidth = AeDimens.MinTouchTarget,
+                    minHeight = AeDimens.MinTouchTarget
+                )
             ) {
                 Icon(imageVector = Icons.Default.Close, contentDescription = "Close details")
             }
@@ -1293,10 +1606,11 @@ fun OccupiedSeatDetailsSheetContent(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium,
+            shape = MaterialTheme.shapes.large,
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+            ),
+            border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Column(
                 modifier = Modifier
@@ -1314,7 +1628,7 @@ fun OccupiedSeatDetailsSheetContent(
                     },
                     isAmount = false
                 )
-                HorizontalDivider()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 TicketDetailRow(
                     label = "Fare Paid",
                     value = formatPhp(ticket.fareAmount),
@@ -1344,7 +1658,8 @@ fun OccupiedSeatDetailsSheetContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = AeDimens.PrimaryButtonHeight),
-            shape = MaterialTheme.shapes.medium
+            shape = CircleShape,
+            border = BorderStroke(AeDimens.BorderWidthThick, MaterialTheme.colorScheme.primary)
         ) {
             Icon(
                 imageVector = Icons.Default.QrCode2,
@@ -1361,10 +1676,10 @@ fun OccupiedSeatDetailsSheetContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = AeDimens.PrimaryButtonHeight),
-            shape = MaterialTheme.shapes.medium,
+            shape = CircleShape,
             colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                containerColor = ElectricBlue,
+                contentColor = PureWhite
             )
         ) {
             Icon(
@@ -1415,7 +1730,7 @@ private fun TicketDetailRow(
 }
 
 // ============================================================================
-// Previews (2x2 Seat Map, 2x3 Seat Map, Issue Ticket Sheet States)
+// Previews (2x2 Seat Map Light/Dark, 2x3 Seat Map, Issue Ticket Sheet States)
 // ============================================================================
 
 private val previewRoute = Route(
@@ -1465,7 +1780,12 @@ private val previewSampleTicket4 = Ticket(
     updatedAt = 1_700_000_060_000L
 )
 
-@Preview(showBackground = true, name = "Seat Map — 2x2 Layout")
+@Preview(showBackground = true, name = "Seat Map — 2x2 Light")
+@Preview(
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    name = "Seat Map — 2x2 Dark"
+)
 @Composable
 private fun ConductorTicketing2x2Preview() {
     AeTranzitTheme {
@@ -1505,7 +1825,8 @@ private fun ConductorTicketing2x2Preview() {
                 lastIssuedTicket = previewSampleTicket4
             ),
             onEvent = {},
-            onNavigateBack = {}
+            onNavigateBack = {},
+            onOpenSettings = {}
         )
     }
 }
@@ -1545,7 +1866,8 @@ private fun ConductorTicketing2x3Preview() {
                 totalTripCollection = 195.0
             ),
             onEvent = {},
-            onNavigateBack = {}
+            onNavigateBack = {},
+            onOpenSettings = {}
         )
     }
 }

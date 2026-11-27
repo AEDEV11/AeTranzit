@@ -11,3 +11,8 @@ val AeTranzitShapes = Shapes(
     large = RoundedCornerShape(20.dp),
     extraLarge = RoundedCornerShape(28.dp)
 )
+
+val HeroHeaderBottomShape = RoundedCornerShape(
+    bottomStart = 28.dp,
+    bottomEnd = 28.dp
+)

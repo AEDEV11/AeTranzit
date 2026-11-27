@@ -8,12 +8,11 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val LightColorScheme = lightColorScheme(
     primary = ElectricBlue,
-    onPrimary = Color.White,
+    onPrimary = PureWhite,
     primaryContainer = BlueContainerLight,
     onPrimaryContainer = BlueOnContainerLight,
     secondary = TransitTeal,
@@ -21,7 +20,9 @@ private val LightColorScheme = lightColorScheme(
     secondaryContainer = TealContainerLight,
     onSecondaryContainer = TealOnContainerLight,
     tertiary = DeepNavy,
-    onTertiary = Color.White,
+    onTertiary = PureWhite,
+    tertiaryContainer = NavyContainerLight,
+    onTertiaryContainer = NavyOnContainerLight,
     background = LightBackground,
     onBackground = LightOnSurface,
     surface = LightSurface,
@@ -29,10 +30,11 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant = LightSurfaceVariant,
     onSurfaceVariant = LightOnSurfaceVariant,
     outline = LightOutline,
+    outlineVariant = LightOutlineVariant,
     error = ErrorRedLight,
-    onError = Color.White,
+    onError = PureWhite,
     errorContainer = ErrorContainerLight,
-    onErrorContainer = Color(0xFF410002)
+    onErrorContainer = ErrorOnContainerLight
 )
 
 private val DarkColorScheme = darkColorScheme(
@@ -46,6 +48,8 @@ private val DarkColorScheme = darkColorScheme(
     onSecondaryContainer = TealOnContainerDark,
     tertiary = NavyElevated,
     onTertiary = DarkOnSurface,
+    tertiaryContainer = NavyContainerDark,
+    onTertiaryContainer = NavyOnContainerDark,
     background = DarkBackground,
     onBackground = DarkOnSurface,
     surface = DarkSurface,
@@ -53,8 +57,9 @@ private val DarkColorScheme = darkColorScheme(
     surfaceVariant = DarkSurfaceVariant,
     onSurfaceVariant = DarkOnSurfaceVariant,
     outline = DarkOutline,
+    outlineVariant = DarkOutlineVariant,
     error = ErrorRedDark,
-    onError = Color(0xFF690005),
+    onError = OnErrorDark,
     errorContainer = ErrorContainerDark,
     onErrorContainer = ErrorRedDark
 )

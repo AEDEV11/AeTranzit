@@ -1,5 +1,7 @@
 package com.aedev.aetranzit.ui.admin
 
+import android.content.res.Configuration
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,9 +13,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -50,12 +55,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aedev.aetranzit.R
 import com.aedev.aetranzit.domain.model.Route
 import com.aedev.aetranzit.domain.model.RouteStop
-import com.aedev.aetranzit.ui.components.AePrimaryButton
+import com.aedev.aetranzit.ui.components.AeEmptyStateCard
 import com.aedev.aetranzit.ui.components.formatPhp
 import com.aedev.aetranzit.ui.theme.AeDimens
 import com.aedev.aetranzit.ui.theme.AeTranzitTheme
+import com.aedev.aetranzit.ui.theme.ElectricBlue
+import com.aedev.aetranzit.ui.theme.PureWhite
 import com.aedev.aetranzit.ui.theme.TabularAmountStyle
 
 @Composable
@@ -81,13 +89,17 @@ fun ManageRoutesContent(
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = { Text("Manage Routes") },
                 navigationIcon = {
                     IconButton(
                         onClick = onNavigateBack,
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                        modifier = Modifier.sizeIn(
+                            minWidth = AeDimens.MinTouchTarget,
+                            minHeight = AeDimens.MinTouchTarget
+                        )
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
@@ -97,8 +109,8 @@ fun ManageRoutesContent(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { onEvent(ManageRoutesUiEvent.OpenAddDialog) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                containerColor = ElectricBlue,
+                contentColor = PureWhite
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Route")
             }
@@ -138,7 +150,10 @@ fun ManageRoutesContent(
                             },
                             modifier = Modifier.weight(1f)
                         )
-                        TextButton(onClick = { onEvent(ManageRoutesUiEvent.ClearFeedback) }) {
+                        TextButton(
+                            onClick = { onEvent(ManageRoutesUiEvent.ClearFeedback) },
+                            modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                        ) {
                             Text("Dismiss")
                         }
                     }
@@ -152,29 +167,13 @@ fun ManageRoutesContent(
                         .padding(AeDimens.SpaceLg),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceMd)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Route,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "No routes configured yet",
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Text(
-                            text = "Add origin-to-destination corridors with base fares and intermediate stop fares.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        AePrimaryButton(
-                            text = "Add First Route",
-                            onClick = { onEvent(ManageRoutesUiEvent.OpenAddDialog) }
-                        )
-                    }
+                    AeEmptyStateCard(
+                        illustrationRes = R.drawable.empty_fleet_route,
+                        title = "No Routes Configured Yet",
+                        subtitle = "Add origin-to-destination corridors with base fares and intermediate stop fares.",
+                        actionLabel = "Add First Route",
+                        onActionClick = { onEvent(ManageRoutesUiEvent.OpenAddDialog) }
+                    )
                 }
             } else {
                 LazyColumn(
@@ -183,9 +182,9 @@ fun ManageRoutesContent(
                         start = AeDimens.SpaceMd,
                         end = AeDimens.SpaceMd,
                         top = AeDimens.SpaceSm,
-                        bottom = AeDimens.SpaceXl * 2
+                        bottom = AeDimens.FabBottomClearance
                     ),
-                    verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
+                    verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus)
                 ) {
                     items(items = uiState.routes, key = { it.id }) { route ->
                         RouteItemCard(
@@ -245,7 +244,8 @@ private fun RouteItemCard(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation),
+        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -255,8 +255,23 @@ private fun RouteItemCard(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus)
             ) {
+                Surface(
+                    modifier = Modifier.size(AeDimens.ActionRowIconBadgeSize),
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Route,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(AeDimens.IconSm)
+                        )
+                    }
+                }
+
                 Column(modifier = Modifier.weight(1f)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -277,13 +292,14 @@ private fun RouteItemCard(
                                 MaterialTheme.colorScheme.secondary
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
-                            }
+                            },
+                            modifier = Modifier.size(AeDimens.IconXs)
                         )
                     }
                     Spacer(modifier = Modifier.height(AeDimens.SpaceXs))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceMd)
+                        horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus)
                     ) {
                         Text(
                             text = "Base: ${formatPhp(route.baseFare)}",
@@ -293,16 +309,16 @@ private fun RouteItemCard(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Surface(
-                            shape = MaterialTheme.shapes.small,
+                            shape = CircleShape,
                             color = MaterialTheme.colorScheme.surfaceVariant
                         ) {
                             Text(
-                                text = "${route.stops.size} intermediate ${if (route.stops.size == 1) "stop" else "stops"}",
+                                text = "${route.stops.size} ${if (route.stops.size == 1) "stop" else "stops"}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(
                                     horizontal = AeDimens.SpaceSm,
-                                    vertical = AeDimens.SpaceXs
+                                    vertical = AeDimens.SpaceXxs
                                 )
                             )
                         }
@@ -312,7 +328,10 @@ private fun RouteItemCard(
                 Row {
                     IconButton(
                         onClick = onEdit,
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                        modifier = Modifier.sizeIn(
+                            minWidth = AeDimens.MinTouchTarget,
+                            minHeight = AeDimens.MinTouchTarget
+                        )
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
@@ -321,7 +340,10 @@ private fun RouteItemCard(
                     }
                     IconButton(
                         onClick = onDelete,
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                        modifier = Modifier.sizeIn(
+                            minWidth = AeDimens.MinTouchTarget,
+                            minHeight = AeDimens.MinTouchTarget
+                        )
                     ) {
                         Icon(
                             imageVector = Icons.Default.DeleteOutline,
@@ -384,6 +406,7 @@ private fun RouteEditorDialog(
                     value = uiState.originInput,
                     onValueChange = { onEvent(ManageRoutesUiEvent.OriginChanged(it)) },
                     label = { Text("Origin (e.g., Cubao)") },
+                    shape = MaterialTheme.shapes.medium,
                     singleLine = true,
                     isError = uiState.originError != null,
                     supportingText = uiState.originError?.let { msg -> { Text(msg) } },
@@ -397,6 +420,7 @@ private fun RouteEditorDialog(
                     value = uiState.destinationInput,
                     onValueChange = { onEvent(ManageRoutesUiEvent.DestinationChanged(it)) },
                     label = { Text("Destination (e.g., Dau)") },
+                    shape = MaterialTheme.shapes.medium,
                     singleLine = true,
                     isError = uiState.destinationError != null,
                     supportingText = uiState.destinationError?.let { msg -> { Text(msg) } },
@@ -410,6 +434,7 @@ private fun RouteEditorDialog(
                     value = uiState.baseFareInput,
                     onValueChange = { onEvent(ManageRoutesUiEvent.BaseFareChanged(it)) },
                     label = { Text("Full-Route Base Fare (₱)") },
+                    shape = MaterialTheme.shapes.medium,
                     singleLine = true,
                     isError = uiState.baseFareError != null,
                     supportingText = uiState.baseFareError?.let { msg -> { Text(msg) } },
@@ -430,6 +455,7 @@ private fun RouteEditorDialog(
                     )
                     OutlinedButton(
                         onClick = { onEvent(ManageRoutesUiEvent.AddStopDraft) },
+                        shape = CircleShape,
                         modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null)
@@ -463,7 +489,10 @@ private fun RouteEditorDialog(
                                     onClick = {
                                         onEvent(ManageRoutesUiEvent.RemoveStopDraft(draft.draftId))
                                     },
-                                    modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                                    modifier = Modifier.sizeIn(
+                                        minWidth = AeDimens.MinTouchTarget,
+                                        minHeight = AeDimens.MinTouchTarget
+                                    )
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Close,
@@ -478,6 +507,7 @@ private fun RouteEditorDialog(
                                     onEvent(ManageRoutesUiEvent.StopNameChanged(draft.draftId, it))
                                 },
                                 label = { Text("Stop Name") },
+                                shape = MaterialTheme.shapes.medium,
                                 singleLine = true,
                                 isError = draft.nameError != null,
                                 supportingText = draft.nameError?.let { msg -> { Text(msg) } },
@@ -493,6 +523,7 @@ private fun RouteEditorDialog(
                                     onEvent(ManageRoutesUiEvent.StopFareChanged(draft.draftId, it))
                                 },
                                 label = { Text("Stop Fare (₱)") },
+                                shape = MaterialTheme.shapes.medium,
                                 singleLine = true,
                                 isError = draft.fareError != null,
                                 supportingText = draft.fareError?.let { msg -> { Text(msg) } },
@@ -528,6 +559,7 @@ private fun RouteEditorDialog(
 }
 
 @Preview(showBackground = true)
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ManageRoutesContentPreview() {
     AeTranzitTheme {

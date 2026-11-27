@@ -1,9 +1,9 @@
 package com.aedev.aetranzit.ui.admin.reports
 
 import android.content.res.Configuration
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,22 +13,25 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.TableView
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -49,12 +52,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aedev.aetranzit.R
 import com.aedev.aetranzit.domain.usecase.AnalyticsDateRange
 import com.aedev.aetranzit.domain.usecase.ReportTicketRow
+import com.aedev.aetranzit.ui.components.AeEmptyStateCard
 import com.aedev.aetranzit.ui.components.formatPhp
 import com.aedev.aetranzit.ui.theme.AeDimens
 import com.aedev.aetranzit.ui.theme.AeTranzitTheme
+import com.aedev.aetranzit.ui.theme.DeepNavy
+import com.aedev.aetranzit.ui.theme.ElectricBlue
+import com.aedev.aetranzit.ui.theme.NavyHeaderBorder
+import com.aedev.aetranzit.ui.theme.NavyHeaderSurface
+import com.aedev.aetranzit.ui.theme.NavySubtleText
+import com.aedev.aetranzit.ui.theme.PureWhite
 import com.aedev.aetranzit.ui.theme.TabularAmountStyle
+import com.aedev.aetranzit.ui.theme.TabularLabelStyle
+import com.aedev.aetranzit.ui.theme.TransitTealDark
 
 @Composable
 fun AdminReportsScreen(
@@ -78,6 +91,7 @@ fun AdminReportsScreen(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminReportsContent(
     uiState: AdminReportsUiState,
@@ -92,13 +106,17 @@ fun AdminReportsContent(
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = { Text("Reports & Exports") },
                 navigationIcon = {
                     IconButton(
                         onClick = onNavigateBack,
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                        modifier = Modifier.sizeIn(
+                            minWidth = AeDimens.MinTouchTarget,
+                            minHeight = AeDimens.MinTouchTarget
+                        )
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -156,7 +174,7 @@ fun AdminReportsContent(
                     )
                     Text(
                         text = "${uiState.totalTicketsCount} ${if (uiState.totalTicketsCount == 1) "record" else "records"}",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = TabularLabelStyle.merge(MaterialTheme.typography.labelMedium),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -187,9 +205,10 @@ private fun ReportsFilterSection(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation),
+        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -213,6 +232,7 @@ private fun ReportsFilterSection(
                     FilterChip(
                         selected = selected,
                         onClick = { onSelectDateRange(range) },
+                        shape = CircleShape,
                         label = { Text(range.chipLabel) },
                         leadingIcon = if (selected) {
                             {
@@ -245,6 +265,7 @@ private fun ReportsFilterSection(
                     FilterChip(
                         selected = uiState.selectedBusId == null,
                         onClick = { onSelectBus(null) },
+                        shape = CircleShape,
                         label = { Text("All Buses") },
                         modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
                     )
@@ -252,6 +273,7 @@ private fun ReportsFilterSection(
                         FilterChip(
                             selected = uiState.selectedBusId == option.id,
                             onClick = { onSelectBus(option.id) },
+                            shape = CircleShape,
                             label = { Text(option.label) },
                             modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
                         )
@@ -274,6 +296,7 @@ private fun ReportsFilterSection(
                     FilterChip(
                         selected = uiState.selectedConductorId == null,
                         onClick = { onSelectConductor(null) },
+                        shape = CircleShape,
                         label = { Text("All Conductors") },
                         modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
                     )
@@ -281,6 +304,7 @@ private fun ReportsFilterSection(
                         FilterChip(
                             selected = uiState.selectedConductorId == option.id,
                             onClick = { onSelectConductor(option.id) },
+                            shape = CircleShape,
                             label = { Text(option.label) },
                             modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
                         )
@@ -301,9 +325,9 @@ private fun ReportSummaryAndExportCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = DeepNavy),
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.ElevatedCardElevation)
     ) {
         Column(
             modifier = Modifier
@@ -311,46 +335,55 @@ private fun ReportSummaryAndExportCard(
                 .padding(AeDimens.SpaceMd),
             verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceMd)
         ) {
-            Row(
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                shape = MaterialTheme.shapes.large,
+                color = NavyHeaderSurface,
+                border = BorderStroke(AeDimens.BorderWidth, NavyHeaderBorder)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Filtered Revenue",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = formatPhp(uiState.totalRevenue),
-                        style = TabularAmountStyle.copy(
-                            fontSize = MaterialTheme.typography.headlineSmall.fontSize
-                        ),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AeDimens.SpaceMd),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Filtered Revenue",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = NavySubtleText
+                        )
+                        Text(
+                            text = formatPhp(uiState.totalRevenue),
+                            style = TabularAmountStyle.copy(
+                                fontSize = MaterialTheme.typography.headlineSmall.fontSize
+                            ),
+                            color = PureWhite
+                        )
+                    }
 
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "Total Tickets",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = "${uiState.totalTicketsCount}",
-                        style = TabularAmountStyle.copy(
-                            fontSize = MaterialTheme.typography.headlineSmall.fontSize
-                        ),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "Total Tickets",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = NavySubtleText
+                        )
+                        Text(
+                            text = "${uiState.totalTicketsCount}",
+                            style = TabularAmountStyle.copy(
+                                fontSize = MaterialTheme.typography.headlineSmall.fontSize
+                            ),
+                            color = TransitTealDark
+                        )
+                    }
                 }
             }
 
             Text(
                 text = uiState.filterSummaryLabel,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                color = NavySubtleText
             )
 
             Row(
@@ -360,7 +393,9 @@ private fun ReportSummaryAndExportCard(
                 OutlinedButton(
                     onClick = onExportCsv,
                     enabled = !isBusy,
-                    shape = MaterialTheme.shapes.medium,
+                    shape = CircleShape,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = PureWhite),
+                    border = BorderStroke(AeDimens.BorderWidth, NavyHeaderBorder),
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = AeDimens.MinTouchTarget)
@@ -368,7 +403,8 @@ private fun ReportSummaryAndExportCard(
                     if (uiState.isExportingCsv) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(AeDimens.IconSm),
-                            strokeWidth = AeDimens.BorderWidthThick
+                            strokeWidth = AeDimens.BorderWidthThick,
+                            color = PureWhite
                         )
                     } else {
                         Icon(
@@ -384,7 +420,11 @@ private fun ReportSummaryAndExportCard(
                 Button(
                     onClick = onExportPdf,
                     enabled = !isBusy,
-                    shape = MaterialTheme.shapes.medium,
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ElectricBlue,
+                        contentColor = PureWhite
+                    ),
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = AeDimens.MinTouchTarget)
@@ -393,7 +433,7 @@ private fun ReportSummaryAndExportCard(
                         CircularProgressIndicator(
                             modifier = Modifier.size(AeDimens.IconSm),
                             strokeWidth = AeDimens.BorderWidthThick,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            color = PureWhite
                         )
                     } else {
                         Icon(
@@ -447,7 +487,10 @@ private fun ReportFeedbackBanner(
             )
             IconButton(
                 onClick = onDismiss,
-                modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                modifier = Modifier.sizeIn(
+                    minWidth = AeDimens.MinTouchTarget,
+                    minHeight = AeDimens.MinTouchTarget
+                )
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
@@ -461,40 +504,11 @@ private fun ReportFeedbackBanner(
 
 @Composable
 private fun EmptyReportRecordsCard() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(AeDimens.SpaceXl),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Description,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(AeDimens.IconLg)
-                )
-                Text(
-                    text = "No tickets match these filters",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Adjust the date range, bus, or conductor filter above.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
+    AeEmptyStateCard(
+        illustrationRes = R.drawable.empty_analytics_data,
+        title = "No Tickets Match These Filters",
+        subtitle = "Adjust the date range, bus, or conductor filter above to inspect matching passenger receipts."
+    )
 }
 
 @Composable
@@ -503,7 +517,8 @@ private fun TicketReportRowCard(row: ReportTicketRow) {
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation),
+        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -528,11 +543,13 @@ private fun TicketReportRowCard(row: ReportTicketRow) {
                     )
                     Text(
                         text = "#${row.referenceCode}",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        style = TabularAmountStyle.copy(
+                            fontSize = MaterialTheme.typography.titleMedium.fontSize
+                        ),
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Surface(
-                        shape = MaterialTheme.shapes.small,
+                        shape = CircleShape,
                         color = if (row.isDiscounted) {
                             MaterialTheme.colorScheme.secondaryContainer
                         } else {
@@ -566,7 +583,9 @@ private fun TicketReportRowCard(row: ReportTicketRow) {
 
             Text(
                 text = "Seat ${row.seatNumber} → ${row.destination}",
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                style = TabularLabelStyle.merge(
+                    MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+                ),
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -590,7 +609,7 @@ private fun TicketReportRowCard(row: ReportTicketRow) {
                 Spacer(modifier = Modifier.width(AeDimens.SpaceSm))
                 Text(
                     text = "${row.statusLabel} • ${row.formattedDateTime}",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = TabularLabelStyle.merge(MaterialTheme.typography.labelSmall),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -654,6 +673,23 @@ private fun AdminReportsContentPreview() {
                 discountedTicketsCount = 1,
                 totalRevenue = 323.0
             ),
+            onNavigateBack = {},
+            onSelectDateRange = {},
+            onSelectBus = {},
+            onSelectConductor = {},
+            onExportCsv = {},
+            onExportPdf = {},
+            onDismissFeedback = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Admin Reports - Empty")
+@Composable
+private fun AdminReportsEmptyPreview() {
+    AeTranzitTheme {
+        AdminReportsContent(
+            uiState = AdminReportsUiState(),
             onNavigateBack = {},
             onSelectDateRange = {},
             onSelectBus = {},

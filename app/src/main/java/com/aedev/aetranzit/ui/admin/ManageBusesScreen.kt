@@ -1,5 +1,7 @@
 package com.aedev.aetranzit.ui.admin
 
+import android.content.res.Configuration
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,8 +13,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -46,10 +51,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aedev.aetranzit.R
 import com.aedev.aetranzit.domain.model.Bus
-import com.aedev.aetranzit.ui.components.AePrimaryButton
+import com.aedev.aetranzit.ui.components.AeEmptyStateCard
 import com.aedev.aetranzit.ui.theme.AeDimens
 import com.aedev.aetranzit.ui.theme.AeTranzitTheme
+import com.aedev.aetranzit.ui.theme.ElectricBlue
+import com.aedev.aetranzit.ui.theme.PureWhite
 import com.aedev.aetranzit.ui.theme.TabularAmountStyle
 
 @Composable
@@ -75,13 +83,17 @@ fun ManageBusesContent(
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = { Text("Manage Buses") },
                 navigationIcon = {
                     IconButton(
                         onClick = onNavigateBack,
-                        modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                        modifier = Modifier.sizeIn(
+                            minWidth = AeDimens.MinTouchTarget,
+                            minHeight = AeDimens.MinTouchTarget
+                        )
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
@@ -91,8 +103,8 @@ fun ManageBusesContent(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { onEvent(ManageBusesUiEvent.OpenAddDialog) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                containerColor = ElectricBlue,
+                contentColor = PureWhite
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Bus")
             }
@@ -132,7 +144,10 @@ fun ManageBusesContent(
                             },
                             modifier = Modifier.weight(1f)
                         )
-                        TextButton(onClick = { onEvent(ManageBusesUiEvent.ClearFeedback) }) {
+                        TextButton(
+                            onClick = { onEvent(ManageBusesUiEvent.ClearFeedback) },
+                            modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                        ) {
                             Text("Dismiss")
                         }
                     }
@@ -146,29 +161,13 @@ fun ManageBusesContent(
                         .padding(AeDimens.SpaceLg),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceMd)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DirectionsBus,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "No buses configured yet",
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Text(
-                            text = "Add your fleet buses with seat capacity and column layout (2x2 or 2x3) so conductors can start trips.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        AePrimaryButton(
-                            text = "Add First Bus",
-                            onClick = { onEvent(ManageBusesUiEvent.OpenAddDialog) }
-                        )
-                    }
+                    AeEmptyStateCard(
+                        illustrationRes = R.drawable.empty_fleet_route,
+                        title = "No Buses Configured Yet",
+                        subtitle = "Add your fleet buses with seat capacity and column layout (2x2 or 2x3) so conductors can start trips.",
+                        actionLabel = "Add First Bus",
+                        onActionClick = { onEvent(ManageBusesUiEvent.OpenAddDialog) }
+                    )
                 }
             } else {
                 LazyColumn(
@@ -177,9 +176,9 @@ fun ManageBusesContent(
                         start = AeDimens.SpaceMd,
                         end = AeDimens.SpaceMd,
                         top = AeDimens.SpaceSm,
-                        bottom = AeDimens.SpaceXl * 2
+                        bottom = AeDimens.FabBottomClearance
                     ),
-                    verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
+                    verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus)
                 ) {
                     items(items = uiState.buses, key = { it.id }) { bus ->
                         BusItemCard(
@@ -241,15 +240,31 @@ private fun BusItemCard(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation)
+        elevation = CardDefaults.cardElevation(defaultElevation = AeDimens.CardElevation),
+        border = BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(AeDimens.SpaceMd),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSmPlus)
         ) {
+            Surface(
+                modifier = Modifier.size(AeDimens.ActionRowIconBadgeSize),
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.DirectionsBus,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(AeDimens.IconSm)
+                    )
+                }
+            }
+
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -260,7 +275,7 @@ private fun BusItemCard(
                         style = MaterialTheme.typography.titleMedium
                     )
                     Surface(
-                        shape = MaterialTheme.shapes.small,
+                        shape = CircleShape,
                         color = MaterialTheme.colorScheme.secondaryContainer
                     ) {
                         Text(
@@ -269,7 +284,7 @@ private fun BusItemCard(
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.padding(
                                 horizontal = AeDimens.SpaceSm,
-                                vertical = AeDimens.SpaceXs
+                                vertical = AeDimens.SpaceXxs
                             )
                         )
                     }
@@ -284,7 +299,8 @@ private fun BusItemCard(
                             MaterialTheme.colorScheme.secondary
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                        },
+                        modifier = Modifier.size(AeDimens.IconXs)
                     )
                 }
                 Spacer(modifier = Modifier.height(AeDimens.SpaceXs))
@@ -310,7 +326,10 @@ private fun BusItemCard(
             Row {
                 IconButton(
                     onClick = onEdit,
-                    modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                    modifier = Modifier.sizeIn(
+                        minWidth = AeDimens.MinTouchTarget,
+                        minHeight = AeDimens.MinTouchTarget
+                    )
                 ) {
                     Icon(
                         imageVector = Icons.Default.Edit,
@@ -319,7 +338,10 @@ private fun BusItemCard(
                 }
                 IconButton(
                     onClick = onDelete,
-                    modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
+                    modifier = Modifier.sizeIn(
+                        minWidth = AeDimens.MinTouchTarget,
+                        minHeight = AeDimens.MinTouchTarget
+                    )
                 ) {
                     Icon(
                         imageVector = Icons.Default.DeleteOutline,
@@ -348,6 +370,7 @@ private fun BusEditorDialog(
                     value = uiState.busNumberInput,
                     onValueChange = { onEvent(ManageBusesUiEvent.BusNumberChanged(it)) },
                     label = { Text("Bus Number (e.g., 101)") },
+                    shape = MaterialTheme.shapes.medium,
                     singleLine = true,
                     isError = uiState.busNumberError != null,
                     supportingText = uiState.busNumberError?.let { msg -> { Text(msg) } },
@@ -361,6 +384,7 @@ private fun BusEditorDialog(
                     value = uiState.plateNumberInput,
                     onValueChange = { onEvent(ManageBusesUiEvent.PlateNumberChanged(it)) },
                     label = { Text("Plate Number (e.g., NCA-4821)") },
+                    shape = MaterialTheme.shapes.medium,
                     singleLine = true,
                     isError = uiState.plateNumberError != null,
                     supportingText = uiState.plateNumberError?.let { msg -> { Text(msg) } },
@@ -374,6 +398,7 @@ private fun BusEditorDialog(
                     value = uiState.totalSeatsInput,
                     onValueChange = { onEvent(ManageBusesUiEvent.TotalSeatsChanged(it)) },
                     label = { Text("Total Seats (10 – 80)") },
+                    shape = MaterialTheme.shapes.medium,
                     singleLine = true,
                     isError = uiState.totalSeatsError != null,
                     supportingText = uiState.totalSeatsError?.let { msg -> { Text(msg) } },
@@ -431,6 +456,7 @@ private fun BusEditorDialog(
 }
 
 @Preview(showBackground = true)
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ManageBusesContentPreview() {
     AeTranzitTheme {

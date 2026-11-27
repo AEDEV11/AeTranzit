@@ -3,8 +3,8 @@
 > **Mandatory Rule:** Update this file at the end of every completed task or before context compaction so a fresh session can resume with 100% accuracy and zero amnesia.
 
 ## Current Phase
-- **Phase 9: Admin-Only Registration, Separate Company Setup & Admin-Provisioned Staff with Forced Password Change** — **Completed**
-- **Project Status:** **All Phases (0–9) Complete — Multi-Tenant Auto-Sync & Admin-Provisioned Staff Production Ready**
+- **Phase 13: 3D-Flat Isometric Fintech/Transit SaaS UI/UX Overhaul & Drawable Asset Integration** — **Completed**
+- **Project Status:** **All Phases (0–13) Complete — Multi-Tenant Auto-Sync, Admin-Provisioned Staff, 3D-Flat Isometric UI/UX Design System & Reference Assets Production Ready**
 
 ## Completed Features
 - [x] **Phase 0:** Context Engineering & Agent Guardrails (`AGENTS.md`, `.ai/*`, `.ai/skills/*`)
@@ -37,12 +37,13 @@
 - [x] **Phase 8: Multi-Tenant Auto-Sync (Firebase Cloud SSOT + Seamless Offline Room Queue)**
   - [x] WorkManager + Hilt `AeTranzitSyncWorker`, `SyncCoordinator` (strict dependency push + safe pull upsert), `NetworkConnectivityObserver`, `SyncStatusBadge`, and session linking on login
 - [x] **Phase 9: Admin-Only Registration, Separate Company Setup & Admin-Provisioned Staff with Forced Password Change**
-  - [x] **Room v3 Migration:** Added `mustChangePassword: Boolean = false` to `UserEntity` & `User`, bumped `AeTranzitDatabase` to `version = 3` (schema `3.json` exported), and added `MIGRATION_2_3` alongside intact `MIGRATION_1_2` in `DatabaseModule`
-  - [x] **Clean Admin-Only Registration:** Stripped role selector, company name, and join code fields from `RegisterScreen` & `AuthViewModel`; `AuthRepositoryImpl.register` creates an `ADMIN` with `companyId = ""` and `mustChangePassword = false` and routes to `COMPANY_SETUP`
-  - [x] **Dedicated Business Setup Screen:** Built `CompanySetupScreen` + `CompanySetupViewModel` (`ui/admin/setup/`) and centralized `AeTranzitRoutes.postAuthRouteFor(user)` enforcement across `SplashScreen`, `LoginScreen`, `RegisterScreen`, and `AeTranzitNavHost`
-  - [x] **Admin-Provisioned Staff (Secondary `FirebaseApp`):** Added `"Add Staff"` FAB, modal sheet (Full Name, Email, `Conductor`/`Admin` role selector, Temporary Password + `"Generate"` helper), and post-creation `"Copy Credentials"` dialog in `ManageStaffScreen`; implemented `FirebaseAuthSyncDataSource.provisionStaffAccount` using temporary secondary `FirebaseApp` (`"staff_provisioner"`) so the signed-in Admin is never signed out; removed legacy Join Code invite banners from `AdminDashboardScreen` and `ManageStaffScreen`
-  - [x] **Forced First-Login Password Change:** Built `ForceChangePasswordScreen` + `ForceChangePasswordViewModel` (`ui/auth/`) blocking back-navigation until `mustChangePassword` is cleared via `AuthRepository.completeForcedPasswordChange` (updating Room, `FirebaseAuth.currentUser.updatePassword`, and Firestore `users/{uid}`)
-  - [x] **Firestore Security Rules & QA:** Updated `firestore.rules` for `mustChangePassword: bool`, unconfigured Admin `companyId == ""`, one-time founder `companyId` assignment, and self-service `mustChangePassword` clearing; verified `./gradlew :app:assembleDebug :app:testDebugUnitTest --console=plain` **BUILD SUCCESSFUL** with all unit tests passing
+  - [x] Room v3 (`MIGRATION_2_3` + `mustChangePassword`), Admin-only `RegisterScreen`, `CompanySetupScreen`, secondary-`FirebaseApp` staff provisioning in `ManageStaffScreen`, and blocking `ForceChangePasswordScreen`
+- [x] **Phase 13: 3D-Flat Isometric Fintech/Transit SaaS UI/UX Overhaul & Drawable Asset Integration**
+  - [x] **Transparent Brand Bus Emblem:** Converted `app/src/main/res/drawable/ic_brand_bus_emblem.webp` in-place to transparent `RGBA` `WEBP` (`2048x2048`, `border_max_alpha = 0`) for clean compositing over Deep Navy banners
+  - [x] **Theme & Shared UI Tokens (`ui/theme/`, `ui/components/`):** Enforced centralized palette (`DeepNavy #0A192F`, `ElectricBlue #007BFF`, `TransitTeal #00C9A7`, `PureWhite #FFFFFF`, `CoolMist #F6F8FC`), `Plus Jakarta Sans` + `Inter` + tabular numerals (`TabularAmountStyle` / `TabularLabelStyle`), zero hardcoded hex colors or `.dp` literals outside `ui/theme/`, `>= 48.dp` touch targets (`AeDimens.MinTouchTarget`), `AeIsometricBackground` (`bg_auth_isometric`), `AeEmptyStateCard`, `AePrimaryButton`, `AeTranzitBrandHeader`, and `SyncStatusBadge(onDarkHeader)`
+  - [x] **Onboarding, Auth & Setup (`ui/onboarding/`, `ui/auth/`, `ui/admin/setup/`):** Aligned `OnboardingScreen`, `SplashScreen`, `LoginScreen`, `RegisterScreen`, `ForceChangePasswordScreen`, and `CompanySetupScreen` with full-bleed `bg_auth_isometric` (Light + subtle Dark fallback), `1:1` transparent `.webp` studio stage, `extraLarge` white/dark cards, and pill CTAs
+  - [x] **Conductor Shift, Seat Map & Digital Ticket (`ui/conductor/`):** Built curved Deep Navy hero headers (`ic_brand_bus_emblem`, `SyncStatusBadge`), wired `ic_seat_available` / `ic_seat_selected` / `ic_seat_occupied` seat tiles with `tnum` seat numbers + text labels + accessibility descriptions in `ConductorTicketingScreen`, wired `empty_fleet_route` in `ConductorHomeScreen`, and aligned photo-ready `DigitalTicketScreen` (`ic_brand_bus_emblem`, Electric Blue `SEAT` banner, `-20%` discount pill, `tnum` `Fare`/`Cash`/`Change`, side-notched perforated divider, pure-white QR card, stacked pill share/SMS CTAs)
+  - [x] **Admin Hub, Fleet, Staff, Reports & Settings (`ui/admin/`, `ui/settings/`):** Aligned `AdminDashboardScreen` (`ic_brand_bus_emblem` Deep Navy hero header, pill date filters, circular-badge KPI grid, Vico chart with `empty_analytics_data` fallback, grouped directory rows), `ManageBusesScreen` & `ManageRoutesScreen` (`empty_fleet_route`), `AdminReportsScreen` (`empty_analytics_data`), `ManageStaffScreen`, and `SettingsScreen` with Light + Dark `@Preview` coverage and passing `:app:assembleDebug :app:testDebugUnitTest` (`71 passed, 0 failed`)
 
 ## Phase Roadmap & Checklist
 - [x] **Phase 1: Auth & Setup**
@@ -53,51 +54,45 @@
 - [x] **Phase 6: Security Rules, Edge-Case QA & Verification**
 - [x] **Phase 7: Multi-Company (Multi-Tenant) Architecture Upgrade**
 - [x] **Phase 8: Multi-Tenant Auto-Sync (Firebase Cloud SSOT + Seamless Offline Room Queue)**
-- [x] **Phase 10: Codebase Cleanup Pass & 4-Slide Onboarding Screen** — Removed obsolete methods/classes, added DataStore `hasCompletedOnboarding`, built `OnboardingViewModel` & 4-slide `OnboardingScreen` using `.webp` assets, wired routing in `SplashViewModel` & `AeTranzitNavHost`, and added unit tests. All 70 unit tests passing.
+- [x] **Phase 9: Admin-Only Registration, Separate Company Setup & Admin-Provisioned Staff with Forced Password Change**
+- [x] **Phase 10: Codebase Cleanup Pass & 4-Slide Onboarding Screen**
+- [x] **Phase 11: Animated Logo Video Splash Screen**
+- [x] **Phase 12: Transparent `RGBA` Onboarding WebP Asset Cleanup**
+- [x] **Phase 13: 3D-Flat Isometric Fintech/Transit SaaS UI/UX Overhaul & Drawable Asset Integration**
 
 ## Active Task
-- None — Codebase cleanup and 4-Slide Onboarding Screen complete and verified. Ready for device deployment or further instructions.
+- None — Phase 13 UI/UX overhaul and reference drawable asset integration complete and verified (`:app:assembleDebug` and `:app:testDebugUnitTest` passing with 71/71 tests green, Compose `@Preview`s rendered and verified). Ready for device deployment or further instructions.
 
 ## Known Bugs / Open Questions
 - None blocking.
 
-## Exact File Paths Modified / Created (Phase 9)
+## Exact File Paths Modified / Created (Phase 13 — 3D-Flat Isometric UI/UX & Reference Assets)
 ### Created
-- `app/schemas/com.aedev.aetranzit.data.local.AeTranzitDatabase/3.json`
-- `app/src/main/java/com/aedev/aetranzit/ui/admin/setup/CompanySetupViewModel.kt`
-- `app/src/main/java/com/aedev/aetranzit/ui/admin/setup/CompanySetupScreen.kt`
-- `app/src/main/java/com/aedev/aetranzit/ui/auth/ForceChangePasswordViewModel.kt`
-- `app/src/main/java/com/aedev/aetranzit/ui/auth/ForceChangePasswordScreen.kt`
-- `app/src/test/java/com/aedev/aetranzit/ui/auth/ForceChangePasswordViewModelTest.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/components/AeIsometricBackground.kt`
 
 ### Updated
-- `app/src/main/java/com/aedev/aetranzit/data/local/entity/UserEntity.kt`
-- `app/src/main/java/com/aedev/aetranzit/domain/model/User.kt`
-- `app/src/main/java/com/aedev/aetranzit/data/mapper/UserMapper.kt`
-- `app/src/main/java/com/aedev/aetranzit/data/local/dao/UserDao.kt`
-- `app/src/main/java/com/aedev/aetranzit/data/local/AeTranzitDatabase.kt`
-- `app/src/main/java/com/aedev/aetranzit/di/DatabaseModule.kt`
-- `app/src/main/java/com/aedev/aetranzit/domain/repository/AuthRepository.kt`
-- `app/src/main/java/com/aedev/aetranzit/data/remote/FirebaseSyncErrorMapper.kt`
-- `app/src/main/java/com/aedev/aetranzit/data/remote/FirebaseAuthSyncDataSource.kt`
-- `app/src/main/java/com/aedev/aetranzit/data/remote/FirebaseFleetSyncDataSource.kt`
-- `app/src/main/java/com/aedev/aetranzit/data/repository/AuthRepositoryImpl.kt`
-- `app/src/main/java/com/aedev/aetranzit/ui/navigation/AeTranzitRoutes.kt`
-- `app/src/main/java/com/aedev/aetranzit/ui/navigation/AeTranzitNavHost.kt`
-- `app/src/main/java/com/aedev/aetranzit/ui/auth/SplashViewModel.kt`
+- `app/src/main/res/drawable/ic_brand_bus_emblem.webp`
+- `app/src/main/java/com/aedev/aetranzit/ui/theme/Color.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/theme/Theme.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/theme/Type.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/theme/Shape.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/theme/Dimens.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/components/AePrimaryButton.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/components/AeTranzitBrandHeader.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/components/SyncStatusBadge.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/onboarding/OnboardingScreen.kt`
 - `app/src/main/java/com/aedev/aetranzit/ui/auth/SplashScreen.kt`
 - `app/src/main/java/com/aedev/aetranzit/ui/auth/LoginScreen.kt`
 - `app/src/main/java/com/aedev/aetranzit/ui/auth/RegisterScreen.kt`
-- `app/src/main/java/com/aedev/aetranzit/ui/auth/AuthViewModel.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/auth/ForceChangePasswordScreen.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/admin/setup/CompanySetupScreen.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/conductor/ConductorHomeScreen.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/conductor/ConductorTicketingScreen.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/conductor/ticket/DigitalTicketScreen.kt`
 - `app/src/main/java/com/aedev/aetranzit/ui/admin/AdminDashboardScreen.kt`
-- `app/src/main/java/com/aedev/aetranzit/ui/admin/staff/ManageStaffViewModel.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/admin/ManageBusesScreen.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/admin/ManageRoutesScreen.kt`
+- `app/src/main/java/com/aedev/aetranzit/ui/admin/reports/AdminReportsScreen.kt`
 - `app/src/main/java/com/aedev/aetranzit/ui/admin/staff/ManageStaffScreen.kt`
-- `firestore.rules`
-- `app/src/test/java/com/aedev/aetranzit/data/repository/AuthRepositoryImplTest.kt`
-- `app/src/test/java/com/aedev/aetranzit/data/sync/SyncCoordinatorTest.kt`
-- `app/src/test/java/com/aedev/aetranzit/ui/auth/AuthViewModelTest.kt`
-- `app/src/test/java/com/aedev/aetranzit/ui/admin/staff/ManageStaffViewModelTest.kt`
-- `app/src/test/java/com/aedev/aetranzit/ui/conductor/ticket/DigitalTicketViewModelTest.kt`
-- `.ai/ARCHITECTURE_DECISIONS.md`
-- `.ai/PROJECT_CONTEXT.md`
+- `app/src/main/java/com/aedev/aetranzit/ui/settings/SettingsScreen.kt`
 - `.ai/PROGRESS_STATE.md`

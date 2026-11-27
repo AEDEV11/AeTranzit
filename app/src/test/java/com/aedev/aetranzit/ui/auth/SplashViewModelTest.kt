@@ -9,8 +9,10 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -18,6 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SplashViewModelTest {
@@ -36,6 +39,22 @@ class SplashViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `resolveSession holds Loading until minimum splash duration elapses`() = runTest {
+        fakeAuthRepository.currentUser = null
+        fakeSyncPreferencesRepository.setOnboardingCompleted(true)
+
+        val viewModel = SplashViewModel(fakeAuthRepository, fakeSyncPreferencesRepository)
+
+        advanceTimeBy((SplashViewModel.MIN_SPLASH_DURATION_MS - 1L).milliseconds)
+        runCurrent()
+        assertEquals(SplashDestination.Loading, viewModel.destination.value)
+
+        advanceTimeBy(1.milliseconds)
+        runCurrent()
+        assertEquals(SplashDestination.Login, viewModel.destination.value)
     }
 
     @Test
