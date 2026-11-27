@@ -1,5 +1,6 @@
 package com.aedev.aetranzit.domain.usecase
 
+import com.aedev.aetranzit.domain.model.Company
 import com.aedev.aetranzit.domain.model.Ticket
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -9,40 +10,29 @@ import javax.inject.Inject
 
 class TicketPayloadFormatter @Inject constructor() {
 
+    fun buildVerificationUrl(ticketId: String): String {
+        val cleanId = ticketId.trim()
+        require(cleanId.isNotEmpty()) { "Ticket ID must not be blank for web verification URL." }
+        return "$WEB_TICKET_BASE_URL$cleanId"
+    }
+
+    @Suppress("UNUSED_PARAMETER")
     fun buildQrPayload(
         ticket: Ticket,
-        busNumber: String,
-        routeLabel: String
-    ): String {
-        val safeBus = sanitizeSegment(busNumber).ifBlank { "NA" }
-        val safeRoute = sanitizeSegment(routeLabel).ifBlank { "NA" }
-        val safeSeat = sanitizeSegment(ticket.seatNumber).ifBlank { "NA" }
-        val safeDestination = sanitizeSegment(ticket.destination).ifBlank { "NA" }
-        val fareFixed = String.format(Locale.US, "%.2f", ticket.fareAmount)
-
-        return listOf(
-            PAYLOAD_PREFIX,
-            PAYLOAD_VERSION,
-            ticket.referenceCode,
-            sanitizeSegment(ticket.tripId),
-            "B:$safeBus",
-            "R:$safeRoute",
-            "S$safeSeat",
-            safeDestination,
-            ticket.passengerType.name,
-            fareFixed,
-            ticket.createdAt.toString()
-        ).joinToString(separator = "|")
-    }
+        busNumber: String = "",
+        routeLabel: String = ""
+    ): String = buildVerificationUrl(ticket.id)
 
     fun buildSmsReceiptText(
         ticket: Ticket,
+        companyName: String = Company.FALLBACK_BRAND_NAME,
         busNumber: String,
         plateNumber: String,
         routeLabel: String,
         conductorName: String,
         timeZone: TimeZone = TimeZone.getDefault()
     ): String {
+        val resolvedCompany = companyName.trim().ifBlank { Company.FALLBACK_BRAND_NAME }
         val resolvedBus = busNumber.trim().ifBlank { "N/A" }
         val resolvedPlate = plateNumber.trim().ifBlank { "N/A" }
         val resolvedRoute = routeLabel.trim().ifBlank { "N/A" }
@@ -53,9 +43,10 @@ class TicketPayloadFormatter @Inject constructor() {
             ticket.passengerType.displayName
         }
         val formattedTime = formatTimestamp(ticket.createdAt, timeZone)
+        val verificationUrl = buildVerificationUrl(ticket.id)
 
         return buildString {
-            appendLine("AeTranzit Digital Ticket")
+            appendLine("$resolvedCompany Digital Ticket")
             appendLine("Ref #: #${ticket.referenceCode} (${ticket.status.displayName.uppercase(Locale.US)})")
             appendLine("Bus: $resolvedBus ($resolvedPlate)")
             appendLine("Route: $resolvedRoute")
@@ -64,7 +55,9 @@ class TicketPayloadFormatter @Inject constructor() {
             appendLine("Fare: ${formatCurrency(ticket.fareAmount)}")
             appendLine("Cash: ${formatCurrency(ticket.cashTendered)} | Change: ${formatCurrency(ticket.changeAmount)}")
             appendLine("Conductor: $resolvedConductor")
-            append("Issued: $formattedTime")
+            appendLine("Issued: $formattedTime")
+            appendLine("Powered by AeTranzit")
+            append("Verify/View Ticket: $verificationUrl")
         }
     }
 
@@ -81,15 +74,11 @@ class TicketPayloadFormatter @Inject constructor() {
     private fun formatCurrency(amount: Double): String =
         String.format(Locale.US, "₱%,.2f", amount)
 
-    private fun sanitizeSegment(raw: String): String =
-        raw.replace('|', '-')
-            .replace(WHITESPACE_REGEX, " ")
-            .trim()
-
     companion object {
-        const val PAYLOAD_PREFIX = "AETRANZIT"
-        const val PAYLOAD_VERSION = "v1"
+        /**
+         * Active ticket web verification URL prefix (Firebase Hosting / custom domain).
+         */
+        const val WEB_TICKET_BASE_URL = "https://aetranzit.aesprt.com/t/"
         private const val TIMESTAMP_PATTERN = "MMM dd, yyyy hh:mm a"
-        private val WHITESPACE_REGEX = Regex("\\s+")
     }
 }

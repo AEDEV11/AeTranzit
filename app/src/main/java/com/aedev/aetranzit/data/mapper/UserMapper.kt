@@ -9,7 +9,9 @@ fun UserEntity.toDomain(): User = User(
     name = name,
     email = email,
     role = UserRole.fromRaw(role),
+    companyId = companyId,
     isActive = isActive,
+    mustChangePassword = mustChangePassword,
     isSynced = isSynced,
     updatedAt = updatedAt
 )
@@ -20,7 +22,9 @@ fun User.toEntity(passwordHash: String): UserEntity = UserEntity(
     email = email,
     passwordHash = passwordHash,
     role = role.name,
+    companyId = companyId,
     isActive = isActive,
+    mustChangePassword = mustChangePassword,
     isSynced = isSynced,
     updatedAt = updatedAt
 )

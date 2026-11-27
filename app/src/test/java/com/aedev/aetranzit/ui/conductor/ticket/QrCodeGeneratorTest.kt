@@ -1,5 +1,6 @@
 package com.aedev.aetranzit.ui.conductor.ticket
 
+import com.aedev.aetranzit.domain.usecase.TicketPayloadFormatter
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.LuminanceSource
 import com.google.zxing.common.BitMatrix
@@ -17,8 +18,7 @@ class QrCodeGeneratorTest {
 
     @Test
     fun `encodeBitMatrix generates scannable QR matrix with white quiet zone`() {
-        val payload =
-            "AETRANZIT|v1|F8A1BC23|trip-501|B:AE-108|R:Cubao -> Baguio|S12|Dau Terminal|STUDENT|128.00|1764144000000"
+        val payload = "${TicketPayloadFormatter.WEB_TICKET_BASE_URL}f8a1bc23-9876-4321-abcd-112233445566"
 
         val matrix = generator.encodeBitMatrix(
             payload = payload,

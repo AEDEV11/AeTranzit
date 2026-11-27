@@ -40,7 +40,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.aedev.aetranzit.domain.model.UserRole
+import com.aedev.aetranzit.domain.model.User
 import com.aedev.aetranzit.ui.components.AePrimaryButton
 import com.aedev.aetranzit.ui.components.AeTranzitBrandHeader
 import com.aedev.aetranzit.ui.theme.AeDimens
@@ -48,7 +48,7 @@ import com.aedev.aetranzit.ui.theme.AeTranzitTheme
 
 @Composable
 fun LoginScreen(
-    onAuthenticated: (UserRole) -> Unit,
+    onAuthenticated: (User) -> Unit,
     onNavigateToRegister: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
@@ -57,7 +57,7 @@ fun LoginScreen(
     LaunchedEffect(Unit) {
         viewModel.effects.collect { effect ->
             when (effect) {
-                is AuthEffect.Authenticated -> onAuthenticated(effect.user.role)
+                is AuthEffect.Authenticated -> onAuthenticated(effect.user)
             }
         }
     }
@@ -202,7 +202,7 @@ fun LoginContent(
                 modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
             ) {
                 Text(
-                    text = "Need an account? Register Staff",
+                    text = "Bus operator? Create Admin Account",
                     style = MaterialTheme.typography.labelLarge
                 )
             }

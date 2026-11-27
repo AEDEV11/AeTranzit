@@ -12,24 +12,24 @@ interface BusDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(bus: BusEntity)
 
-    @Query("SELECT * FROM buses ORDER BY busNumber ASC")
-    fun observeAll(): Flow<List<BusEntity>>
+    @Query("SELECT * FROM buses WHERE companyId = :companyId ORDER BY busNumber ASC")
+    fun observeByCompany(companyId: String): Flow<List<BusEntity>>
 
-    @Query("SELECT * FROM buses WHERE id = :id LIMIT 1")
-    fun observeById(id: String): Flow<BusEntity?>
+    @Query("SELECT * FROM buses WHERE id = :id AND companyId = :companyId LIMIT 1")
+    fun observeByIdAndCompany(id: String, companyId: String): Flow<BusEntity?>
 
-    @Query("SELECT * FROM buses WHERE id = :id LIMIT 1")
-    suspend fun getById(id: String): BusEntity?
+    @Query("SELECT * FROM buses WHERE id = :id AND companyId = :companyId LIMIT 1")
+    suspend fun getByIdAndCompany(id: String, companyId: String): BusEntity?
 
-    @Query("DELETE FROM buses WHERE id = :id")
-    suspend fun deleteById(id: String)
+    @Query("DELETE FROM buses WHERE id = :id AND companyId = :companyId")
+    suspend fun deleteByIdAndCompany(id: String, companyId: String)
 
     @Query("UPDATE buses SET isSynced = 1, updatedAt = :syncedAt WHERE id = :id")
     suspend fun markSynced(id: String, syncedAt: Long)
 
-    @Query("SELECT * FROM buses WHERE isSynced = 0")
-    suspend fun getUnsynced(): List<BusEntity>
+    @Query("SELECT * FROM buses WHERE companyId = :companyId AND isSynced = 0")
+    suspend fun getUnsyncedByCompany(companyId: String): List<BusEntity>
 
-    @Query("SELECT COUNT(*) FROM buses WHERE isSynced = 0")
-    fun observeUnsyncedCount(): Flow<Int>
+    @Query("SELECT COUNT(*) FROM buses WHERE companyId = :companyId AND isSynced = 0")
+    fun observeUnsyncedCountByCompany(companyId: String): Flow<Int>
 }

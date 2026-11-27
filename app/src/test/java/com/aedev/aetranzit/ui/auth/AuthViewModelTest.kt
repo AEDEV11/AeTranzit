@@ -3,6 +3,7 @@ package com.aedev.aetranzit.ui.auth
 import com.aedev.aetranzit.domain.model.User
 import com.aedev.aetranzit.domain.model.UserRole
 import com.aedev.aetranzit.domain.repository.AuthRepository
+import com.aedev.aetranzit.ui.navigation.AeTranzitRoutes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -15,6 +16,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Before
@@ -52,8 +54,8 @@ class AuthViewModelTest {
 
     @Test
     fun `submitRegister rejects mismatched passwords`() {
-        viewModel.onEvent(AuthUiEvent.NameChanged("Juan"))
-        viewModel.onEvent(AuthUiEvent.EmailChanged("juan@aetranzit.com"))
+        viewModel.onEvent(AuthUiEvent.NameChanged("Maria Santos"))
+        viewModel.onEvent(AuthUiEvent.EmailChanged("maria@aetranzit.com"))
         viewModel.onEvent(AuthUiEvent.PasswordChanged("secret123"))
         viewModel.onEvent(AuthUiEvent.ConfirmPasswordChanged("different123"))
         viewModel.onEvent(AuthUiEvent.SubmitRegister)
@@ -62,8 +64,7 @@ class AuthViewModelTest {
     }
 
     @Test
-    fun `submitRegister emits Authenticated effect with selected role`() = runTest {
-        viewModel.onEvent(AuthUiEvent.RoleSelected(UserRole.ADMIN))
+    fun `submitRegister creates ADMIN with empty companyId and routes to COMPANY_SETUP`() = runTest {
         viewModel.onEvent(AuthUiEvent.NameChanged("Maria Santos"))
         viewModel.onEvent(AuthUiEvent.EmailChanged("maria@aetranzit.com"))
         viewModel.onEvent(AuthUiEvent.PasswordChanged("secret123"))
@@ -71,9 +72,47 @@ class AuthViewModelTest {
         viewModel.onEvent(AuthUiEvent.SubmitRegister)
         advanceUntilIdle()
 
-        val effect = viewModel.effects.first()
-        assertEquals(UserRole.ADMIN, (effect as AuthEffect.Authenticated).user.role)
+        val effect = viewModel.effects.first() as AuthEffect.Authenticated
+        assertEquals(UserRole.ADMIN, effect.user.role)
+        assertEquals("", effect.user.companyId)
+        assertFalse(effect.user.mustChangePassword)
+        assertEquals(AeTranzitRoutes.COMPANY_SETUP, AeTranzitRoutes.postAuthRouteFor(effect.user))
         assertNull(viewModel.uiState.value.generalError)
+    }
+
+    @Test
+    fun `postAuthRouteFor enforces FORCE_CHANGE_PASSWORD and COMPANY_SETUP before home`() {
+        val tempStaff = User(
+            id = "u-cond",
+            name = "Ramon",
+            email = "ramon@bus.ph",
+            role = UserRole.CONDUCTOR,
+            companyId = "comp-1",
+            isActive = true,
+            mustChangePassword = true,
+            isSynced = true,
+            updatedAt = 1L
+        )
+        assertEquals(AeTranzitRoutes.FORCE_CHANGE_PASSWORD, AeTranzitRoutes.postAuthRouteFor(tempStaff))
+
+        val readyStaff = tempStaff.copy(mustChangePassword = false)
+        assertEquals(AeTranzitRoutes.CONDUCTOR_HOME, AeTranzitRoutes.postAuthRouteFor(readyStaff))
+
+        val unconfiguredAdmin = User(
+            id = "u-admin",
+            name = "Maria",
+            email = "maria@bus.ph",
+            role = UserRole.ADMIN,
+            companyId = "",
+            isActive = true,
+            mustChangePassword = false,
+            isSynced = true,
+            updatedAt = 1L
+        )
+        assertEquals(AeTranzitRoutes.COMPANY_SETUP, AeTranzitRoutes.postAuthRouteFor(unconfiguredAdmin))
+
+        val configuredAdmin = unconfiguredAdmin.copy(companyId = "comp-1")
+        assertEquals(AeTranzitRoutes.ADMIN_DASHBOARD, AeTranzitRoutes.postAuthRouteFor(configuredAdmin))
     }
 }
 
@@ -94,21 +133,39 @@ private class FakeAuthRepository : AuthRepository {
     override suspend fun register(
         name: String,
         email: String,
-        password: String,
-        role: UserRole
+        password: String
     ): Result<User> {
         val user = User(
             id = "u-1",
             name = name,
             email = email,
-            role = role,
+            role = UserRole.ADMIN,
+            companyId = "",
             isActive = true,
+            mustChangePassword = false,
             isSynced = false,
             updatedAt = 1L
         )
         currentUser.value = user
         return Result.success(user)
     }
+
+    override suspend fun completeCompanySetup(companyName: String): Result<User> {
+        val updated = (currentUser.value ?: return Result.failure(IllegalStateException()))
+            .copy(companyId = "company-new")
+        currentUser.value = updated
+        return Result.success(updated)
+    }
+
+    override suspend fun createStaffAccount(
+        name: String,
+        email: String,
+        temporaryPassword: String,
+        role: UserRole
+    ): Result<User> = Result.failure(UnsupportedOperationException())
+
+    override suspend fun completeForcedPasswordChange(newPassword: String): Result<User> =
+        Result.failure(UnsupportedOperationException())
 
     override suspend fun setUserActiveStatus(userId: String, isActive: Boolean): Result<Unit> =
         Result.success(Unit)

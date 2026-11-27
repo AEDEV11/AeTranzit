@@ -20,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -31,7 +32,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aedev.aetranzit.domain.sync.SyncStatus
 import com.aedev.aetranzit.ui.components.AePrimaryButton
+import com.aedev.aetranzit.ui.components.SyncBadgeUiState
+import com.aedev.aetranzit.ui.components.SyncStatusBadge
 import com.aedev.aetranzit.ui.theme.AeDimens
 import com.aedev.aetranzit.ui.theme.AeTranzitTheme
 import java.text.DateFormat
@@ -128,11 +132,11 @@ fun SettingsContent(
                             )
                             Column {
                                 Text(
-                                    text = "Cloud Sync (Firebase)",
+                                    text = "Auto Cloud Sync (Firebase)",
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 Text(
-                                    text = "Syncs Users, Buses, Routes, Trips & Tickets • Room stays SSOT",
+                                    text = "Firebase Cloud SSOT per company • Offline Room queue auto-syncs on reconnect",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -146,6 +150,18 @@ fun SettingsContent(
                     }
 
                     Spacer(modifier = Modifier.height(AeDimens.SpaceMd))
+
+                    SyncStatusBadge(state = uiState.syncBadgeState)
+
+                    Spacer(modifier = Modifier.height(AeDimens.SpaceSmPlus))
+
+                    Text(
+                        text = "Network: ${if (uiState.isOnline) "Connected" else "Offline (queuing locally)"}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.height(AeDimens.SpaceXs))
 
                     Text(
                         text = "Pending local changes: ${uiState.pendingSyncCount}",
@@ -162,16 +178,27 @@ fun SettingsContent(
                     )
 
                     if (uiState.syncStatusMessage != null) {
-                        Spacer(modifier = Modifier.height(AeDimens.SpaceSm))
-                        Text(
-                            text = uiState.syncStatusMessage,
-                            style = MaterialTheme.typography.bodyMedium,
+                        Spacer(modifier = Modifier.height(AeDimens.SpaceSmPlus))
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
                             color = if (uiState.isSyncError) {
-                                MaterialTheme.colorScheme.error
+                                MaterialTheme.colorScheme.errorContainer
                             } else {
-                                MaterialTheme.colorScheme.secondary
+                                MaterialTheme.colorScheme.secondaryContainer
                             }
-                        )
+                        ) {
+                            Text(
+                                text = uiState.syncStatusMessage,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (uiState.isSyncError) {
+                                    MaterialTheme.colorScheme.onErrorContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                },
+                                modifier = Modifier.padding(AeDimens.SpaceSmPlus)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(AeDimens.SpaceMd))
@@ -195,8 +222,15 @@ private fun SettingsContentPreview() {
         SettingsContent(
             uiState = SettingsUiState(
                 isCloudSyncEnabled = true,
-                pendingSyncCount = 3,
-                syncStatusMessage = "Everything is up to date (Users, Buses, Routes, Trips & Tickets)."
+                isOnline = true,
+                pendingSyncCount = 2,
+                syncStatusMessage = "Two-way sync complete: pushed 2, pulled 4 record(s).",
+                syncBadgeState = SyncBadgeUiState(
+                    syncStatus = SyncStatus.Synced,
+                    isOnline = true,
+                    isCloudSyncEnabled = true,
+                    pendingCount = 0
+                )
             ),
             onEvent = {},
             onNavigateBack = {}

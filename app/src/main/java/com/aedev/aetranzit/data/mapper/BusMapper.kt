@@ -9,6 +9,7 @@ fun BusEntity.toDomain(): Bus = Bus(
     plateNumber = plateNumber,
     totalSeats = totalSeats,
     columns = columns,
+    companyId = companyId,
     isSynced = isSynced,
     updatedAt = updatedAt
 )
@@ -19,6 +20,7 @@ fun Bus.toEntity(): BusEntity = BusEntity(
     plateNumber = plateNumber,
     totalSeats = totalSeats,
     columns = columns,
+    companyId = companyId,
     isSynced = isSynced,
     updatedAt = updatedAt
 )

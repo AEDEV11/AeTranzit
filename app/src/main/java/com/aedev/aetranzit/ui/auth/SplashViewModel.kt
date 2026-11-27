@@ -2,7 +2,7 @@ package com.aedev.aetranzit.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.aedev.aetranzit.domain.model.UserRole
+import com.aedev.aetranzit.domain.model.User
 import com.aedev.aetranzit.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +14,7 @@ import javax.inject.Inject
 sealed interface SplashDestination {
     data object Loading : SplashDestination
     data object Login : SplashDestination
-    data class Authenticated(val role: UserRole) : SplashDestination
+    data class Authenticated(val user: User) : SplashDestination
 }
 
 @HiltViewModel
@@ -35,7 +35,7 @@ class SplashViewModel @Inject constructor(
             _destination.value = if (user == null) {
                 SplashDestination.Login
             } else {
-                SplashDestination.Authenticated(user.role)
+                SplashDestination.Authenticated(user)
             }
         }
     }

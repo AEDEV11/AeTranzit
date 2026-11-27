@@ -6,6 +6,7 @@ data class Bus(
     val plateNumber: String,
     val totalSeats: Int,
     val columns: Int,
+    val companyId: String = Company.DEFAULT_COMPANY_ID,
     val isSynced: Boolean,
     val updatedAt: Long
 ) {

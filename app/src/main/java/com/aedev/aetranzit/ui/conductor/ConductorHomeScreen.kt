@@ -4,7 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -49,6 +48,8 @@ import com.aedev.aetranzit.domain.model.RouteStop
 import com.aedev.aetranzit.domain.model.Trip
 import com.aedev.aetranzit.domain.model.TripStatus
 import com.aedev.aetranzit.ui.components.AePrimaryButton
+import com.aedev.aetranzit.ui.components.SyncBadgeUiState
+import com.aedev.aetranzit.ui.components.SyncStatusBadge
 import com.aedev.aetranzit.ui.components.formatPhp
 import com.aedev.aetranzit.ui.theme.AeDimens
 import com.aedev.aetranzit.ui.theme.AeTranzitTheme
@@ -64,12 +65,14 @@ fun ConductorHomeScreen(
     onOpenSettings: () -> Unit,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier,
+    syncBadgeState: SyncBadgeUiState = SyncBadgeUiState(),
     viewModel: ConductorHomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     ConductorHomeContent(
         userName = userName,
         isCloudSyncEnabled = isCloudSyncEnabled,
+        syncBadgeState = syncBadgeState,
         uiState = uiState,
         onEvent = viewModel::onEvent,
         onOpenTicketing = onOpenTicketing,
@@ -89,7 +92,8 @@ fun ConductorHomeContent(
     onOpenTicketing: (tripId: String) -> Unit,
     onOpenSettings: () -> Unit,
     onLogout: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    syncBadgeState: SyncBadgeUiState = SyncBadgeUiState()
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -123,7 +127,8 @@ fun ConductorHomeContent(
         ) {
             ConductorDutyHeaderCard(
                 userName = userName,
-                isCloudSyncEnabled = isCloudSyncEnabled
+                syncBadgeState = syncBadgeState.copy(isCloudSyncEnabled = isCloudSyncEnabled),
+                onOpenSettings = onOpenSettings
             )
 
             if (uiState.statusMessage != null) {
@@ -221,7 +226,8 @@ fun ConductorHomeContent(
 @Composable
 private fun ConductorDutyHeaderCard(
     userName: String,
-    isCloudSyncEnabled: Boolean
+    syncBadgeState: SyncBadgeUiState,
+    onOpenSettings: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -232,7 +238,8 @@ private fun ConductorDutyHeaderCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(AeDimens.SpaceMd)
+                .padding(AeDimens.SpaceMd),
+            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -243,16 +250,21 @@ private fun ConductorDutyHeaderCard(
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.secondary
                 )
-                Text(
-                    text = "On Duty: $userName",
-                    style = MaterialTheme.typography.titleLarge
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "On Duty: $userName",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Text(
+                        text = "Role: Conductor • Seamless Offline Queue",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(AeDimens.SpaceXs))
-            Text(
-                text = "Role: Conductor • Sync: ${if (isCloudSyncEnabled) "Cloud Enabled" else "Offline Only (Room SSOT)"}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            SyncStatusBadge(
+                state = syncBadgeState,
+                onClick = onOpenSettings
             )
         }
     }
@@ -634,7 +646,15 @@ private fun ConductorHomeNoActiveTripPreview() {
             isCloudSyncEnabled = false,
             uiState = ConductorHomeUiState(
                 buses = listOf(
-                    Bus("b1", "101", "NCA-4821", 45, 4, false, 1L)
+                    Bus(
+                        id = "b1",
+                        busNumber = "101",
+                        plateNumber = "NCA-4821",
+                        totalSeats = 45,
+                        columns = 4,
+                        isSynced = false,
+                        updatedAt = 1L
+                    )
                 ),
                 routes = listOf(
                     Route(
@@ -661,9 +681,35 @@ private fun ConductorHomeNoActiveTripPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun ConductorHomeActiveTripPreview() {
-    val bus = Bus("b1", "101", "NCA-4821", 45, 4, true, 1L)
-    val route = Route("r1", "Cubao", "Dau", 195.0, listOf(RouteStop("Bocaue", 65.0)), true, 1L)
-    val trip = Trip("t1", "b1", "r1", "c1", TripStatus.ACTIVE, 1_700_000_000_000L, null, false, 1L)
+    val bus = Bus(
+        id = "b1",
+        busNumber = "101",
+        plateNumber = "NCA-4821",
+        totalSeats = 45,
+        columns = 4,
+        isSynced = true,
+        updatedAt = 1L
+    )
+    val route = Route(
+        id = "r1",
+        origin = "Cubao",
+        destination = "Dau",
+        baseFare = 195.0,
+        stops = listOf(RouteStop("Bocaue", 65.0)),
+        isSynced = true,
+        updatedAt = 1L
+    )
+    val trip = Trip(
+        id = "t1",
+        busId = "b1",
+        routeId = "r1",
+        conductorId = "c1",
+        status = TripStatus.ACTIVE,
+        startedAt = 1_700_000_000_000L,
+        endedAt = null,
+        isSynced = false,
+        updatedAt = 1L
+    )
     AeTranzitTheme {
         ConductorHomeContent(
             userName = "Juan Dela Cruz",

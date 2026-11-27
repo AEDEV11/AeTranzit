@@ -13,11 +13,16 @@ import com.aedev.aetranzit.domain.model.TicketStatus
 import com.aedev.aetranzit.domain.model.TripStatus
 import com.aedev.aetranzit.domain.repository.SyncPreferencesRepository
 import com.aedev.aetranzit.domain.repository.TicketRepository
+import com.aedev.aetranzit.domain.sync.NoOpSyncScheduler
+import com.aedev.aetranzit.domain.sync.SyncScheduler
 import com.aedev.aetranzit.domain.usecase.CalculateFareUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -28,26 +33,72 @@ import javax.inject.Singleton
 class TicketRepositoryImpl @Inject constructor(
     private val ticketDao: TicketDao,
     private val tripDao: TripDao,
+    private val activeCompanyProvider: ActiveCompanyProvider,
     private val transactionRunner: DatabaseTransactionRunner,
     private val syncPreferencesRepository: SyncPreferencesRepository,
     private val fleetSyncDataSource: FleetSyncRemoteDataSource,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val syncScheduler: SyncScheduler = NoOpSyncScheduler
 ) : TicketRepository {
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeAllTickets(): Flow<List<Ticket>> =
-        ticketDao.observeAll().map { list -> list.map { it.toDomain() } }
+        activeCompanyProvider.observeActiveCompanyId().flatMapLatest { companyId ->
+            if (companyId.isNullOrBlank()) {
+                flowOf(emptyList())
+            } else {
+                ticketDao.observeByCompany(companyId).map { list ->
+                    list.map { it.toDomain() }
+                }
+            }
+        }
 
-    override fun observeTicketById(ticketId: String): Flow<Ticket?> =
-        ticketDao.observeById(ticketId.trim()).map { it?.toDomain() }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun observeTicketById(ticketId: String): Flow<Ticket?> {
+        val cleanId = ticketId.trim()
+        if (cleanId.isBlank()) return flowOf(null)
+        return activeCompanyProvider.observeActiveCompanyId().flatMapLatest { companyId ->
+            if (companyId.isNullOrBlank()) {
+                flowOf(null)
+            } else {
+                ticketDao.observeByIdAndCompany(cleanId, companyId).map { it?.toDomain() }
+            }
+        }
+    }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeTicketsByTrip(tripId: String): Flow<List<Ticket>> =
-        ticketDao.observeByTrip(tripId).map { list -> list.map { it.toDomain() } }
+        activeCompanyProvider.observeActiveCompanyId().flatMapLatest { companyId ->
+            if (companyId.isNullOrBlank()) {
+                flowOf(emptyList())
+            } else {
+                ticketDao.observeByTrip(tripId, companyId).map { list ->
+                    list.map { it.toDomain() }
+                }
+            }
+        }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeActiveTicketsByTrip(tripId: String): Flow<List<Ticket>> =
-        ticketDao.observeActiveTicketsByTrip(tripId).map { list -> list.map { it.toDomain() } }
+        activeCompanyProvider.observeActiveCompanyId().flatMapLatest { companyId ->
+            if (companyId.isNullOrBlank()) {
+                flowOf(emptyList())
+            } else {
+                ticketDao.observeActiveTicketsByTrip(tripId, companyId).map { list ->
+                    list.map { it.toDomain() }
+                }
+            }
+        }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeUnsyncedCount(): Flow<Int> =
-        ticketDao.observeUnsyncedCount()
+        activeCompanyProvider.observeActiveCompanyId().flatMapLatest { companyId ->
+            if (companyId.isNullOrBlank()) {
+                flowOf(0)
+            } else {
+                ticketDao.observeUnsyncedCountByCompany(companyId)
+            }
+        }
 
     override suspend fun issueTicket(
         tripId: String,
@@ -58,6 +109,7 @@ class TicketRepositoryImpl @Inject constructor(
         cashTendered: Double
     ): Result<Ticket> = withContext(ioDispatcher) {
         try {
+            val companyId = activeCompanyProvider.requireActiveCompanyId()
             val cleanTripId = tripId.trim()
             val cleanSeat = seatNumber.trim()
             val cleanDestination = destination.trim()
@@ -95,13 +147,17 @@ class TicketRepositoryImpl @Inject constructor(
             val changeAmount = CalculateFareUseCase.roundCurrency(roundedCash - roundedFare)
 
             val (savedEntity, occupiedSeats) = transactionRunner.runInTransaction {
-                val trip = tripDao.getById(cleanTripId)
-                    ?: throw IllegalArgumentException("Active trip not found.")
+                val trip = tripDao.getByIdAndCompany(cleanTripId, companyId)
+                    ?: throw IllegalArgumentException("Active trip not found in your company.")
                 if (TripStatus.fromRaw(trip.status) != TripStatus.ACTIVE) {
                     throw IllegalStateException("Cannot issue tickets on a completed trip.")
                 }
 
-                val existingForSeat = ticketDao.getActiveTicketForSeat(cleanTripId, cleanSeat)
+                val existingForSeat = ticketDao.getActiveTicketForSeat(
+                    tripId = cleanTripId,
+                    seatNumber = cleanSeat,
+                    companyId = companyId
+                )
                 if (existingForSeat != null) {
                     throw IllegalStateException("Seat $cleanSeat is already occupied.")
                 }
@@ -112,6 +168,7 @@ class TicketRepositoryImpl @Inject constructor(
                     tripId = cleanTripId,
                     busId = trip.busId,
                     conductorId = trip.conductorId,
+                    companyId = trip.companyId,
                     seatNumber = cleanSeat,
                     destination = cleanDestination,
                     passengerType = passengerType.name,
@@ -124,7 +181,7 @@ class TicketRepositoryImpl @Inject constructor(
                     updatedAt = now
                 )
                 ticketDao.upsert(entity)
-                val activeSeats = currentOccupiedSeats(cleanTripId)
+                val activeSeats = currentOccupiedSeats(cleanTripId, companyId)
                 entity to activeSeats
             }
 
@@ -136,6 +193,7 @@ class TicketRepositoryImpl @Inject constructor(
                     syncPreferencesRepository.updateLastSyncedAt(syncedAt)
                     finalEntity = savedEntity.copy(isSynced = true, updatedAt = syncedAt)
                 }
+                syncScheduler.enqueueImmediateSync()
             }
 
             Result.success(finalEntity.toDomain())
@@ -149,6 +207,7 @@ class TicketRepositoryImpl @Inject constructor(
     override suspend fun markPassengerDroppedOff(ticketId: String): Result<Ticket> =
         withContext(ioDispatcher) {
             try {
+                val companyId = activeCompanyProvider.requireActiveCompanyId()
                 val cleanTicketId = ticketId.trim()
                 if (cleanTicketId.isBlank()) {
                     return@withContext Result.failure(
@@ -157,8 +216,8 @@ class TicketRepositoryImpl @Inject constructor(
                 }
 
                 val (updatedEntity, occupiedSeats) = transactionRunner.runInTransaction {
-                    val existing = ticketDao.getById(cleanTicketId)
-                        ?: throw IllegalArgumentException("Ticket not found.")
+                    val existing = ticketDao.getByIdAndCompany(cleanTicketId, companyId)
+                        ?: throw IllegalArgumentException("Ticket not found in your company.")
                     if (TicketStatus.fromRaw(existing.status) == TicketStatus.DROPPED_OFF) {
                         throw IllegalStateException("Passenger has already been marked dropped off.")
                     }
@@ -166,6 +225,7 @@ class TicketRepositoryImpl @Inject constructor(
                     val now = System.currentTimeMillis()
                     ticketDao.updateStatus(
                         ticketId = existing.id,
+                        companyId = companyId,
                         status = TicketStatus.DROPPED_OFF.name,
                         updatedAt = now
                     )
@@ -174,7 +234,7 @@ class TicketRepositoryImpl @Inject constructor(
                         isSynced = false,
                         updatedAt = now
                     )
-                    val activeSeats = currentOccupiedSeats(existing.tripId)
+                    val activeSeats = currentOccupiedSeats(existing.tripId, companyId)
                     updated to activeSeats
                 }
 
@@ -186,6 +246,7 @@ class TicketRepositoryImpl @Inject constructor(
                         syncPreferencesRepository.updateLastSyncedAt(syncedAt)
                         finalEntity = updatedEntity.copy(isSynced = true, updatedAt = syncedAt)
                     }
+                    syncScheduler.enqueueImmediateSync()
                 }
 
                 Result.success(finalEntity.toDomain())
@@ -203,13 +264,16 @@ class TicketRepositoryImpl @Inject constructor(
                     IllegalStateException("Enable Cloud Sync in Settings before syncing.")
                 )
             }
-            val unsynced = ticketDao.getUnsynced()
+            val companyId = activeCompanyProvider.getActiveCompanyId()
+                ?: return@withContext Result.success(0)
+
+            val unsynced = ticketDao.getUnsyncedByCompany(companyId)
             var syncedCount = 0
             val occupiedSeatsCache = mutableMapOf<String, List<String>>()
 
             for (ticket in unsynced) {
                 val occupiedSeats = occupiedSeatsCache.getOrPut(ticket.tripId) {
-                    currentOccupiedSeats(ticket.tripId)
+                    currentOccupiedSeats(ticket.tripId, companyId)
                 }
                 if (fleetSyncDataSource.pushTicketAndOccupiedSeats(ticket, occupiedSeats).isSuccess) {
                     val syncedAt = System.currentTimeMillis()
@@ -228,8 +292,8 @@ class TicketRepositoryImpl @Inject constructor(
         }
     }
 
-    private suspend fun currentOccupiedSeats(tripId: String): List<String> =
-        ticketDao.getActiveTicketsByTrip(tripId)
+    private suspend fun currentOccupiedSeats(tripId: String, companyId: String): List<String> =
+        ticketDao.getActiveTicketsByTrip(tripId, companyId)
             .map { it.seatNumber }
             .distinct()
             .sortedWith(compareBy({ it.toIntOrNull() ?: Int.MAX_VALUE }, { it }))

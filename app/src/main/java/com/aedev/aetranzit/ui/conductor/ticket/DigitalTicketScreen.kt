@@ -71,6 +71,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aedev.aetranzit.R
 import com.aedev.aetranzit.domain.model.Bus
+import com.aedev.aetranzit.domain.model.Company
 import com.aedev.aetranzit.domain.model.PassengerType
 import com.aedev.aetranzit.domain.model.Route
 import com.aedev.aetranzit.domain.model.Ticket
@@ -285,6 +286,7 @@ fun DigitalTicketContent(
                     }
 
                     PhotoReadyTicketCard(
+                        companyName = uiState.companyName,
                         ticket = uiState.ticket,
                         busNumber = uiState.busNumber,
                         plateNumber = uiState.plateNumber,
@@ -303,6 +305,7 @@ fun DigitalTicketContent(
 
 @Composable
 private fun PhotoReadyTicketCard(
+    companyName: String,
     ticket: Ticket,
     busNumber: String,
     plateNumber: String,
@@ -313,6 +316,7 @@ private fun PhotoReadyTicketCard(
     modifier: Modifier = Modifier
 ) {
     val isDroppedOff = ticket.status == TicketStatus.DROPPED_OFF
+    val resolvedCompanyName = companyName.trim().ifBlank { Company.FALLBACK_BRAND_NAME }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -358,7 +362,7 @@ private fun PhotoReadyTicketCard(
                     Spacer(modifier = Modifier.width(AeDimens.SpaceSmPlus))
                     Column {
                         Text(
-                            text = "AeTranzit Digital Ticket",
+                            text = resolvedCompanyName,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = TicketPaperBackground,
@@ -556,8 +560,14 @@ private fun PhotoReadyTicketCard(
                     }
 
                     Text(
-                        text = "Scan QR or snap a photo to keep your digital ticket",
+                        text = "Passenger can scan this QR to open their web receipt copy",
                         style = MaterialTheme.typography.bodySmall,
+                        color = TicketPaperSubtleInk,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "Powered by AeTranzit",
+                        style = MaterialTheme.typography.labelSmall,
                         color = TicketPaperSubtleInk,
                         textAlign = TextAlign.Center
                     )
@@ -938,8 +948,10 @@ private fun buildPreviewDigitalTicketState(
         busNumber = bus.busNumber,
         routeLabel = route.displayName
     )
+    val previewCompanyName = "Victory Liner"
     val smsText = formatter.buildSmsReceiptText(
         ticket = sampleTicket,
+        companyName = previewCompanyName,
         busNumber = bus.busNumber,
         plateNumber = bus.plateNumber,
         routeLabel = route.displayName,
@@ -948,6 +960,7 @@ private fun buildPreviewDigitalTicketState(
     return DigitalTicketUiState(
         ticketId = sampleTicket.id,
         isLoading = false,
+        companyName = previewCompanyName,
         ticket = sampleTicket,
         bus = bus,
         route = route,

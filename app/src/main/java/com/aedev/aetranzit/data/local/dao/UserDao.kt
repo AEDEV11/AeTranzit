@@ -24,18 +24,49 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE id = :id LIMIT 1")
     fun observeById(id: String): Flow<UserEntity?>
 
-    @Query("SELECT * FROM users ORDER BY role ASC, name ASC")
-    fun observeAll(): Flow<List<UserEntity>>
+    @Query("SELECT * FROM users WHERE companyId = :companyId ORDER BY role ASC, name ASC")
+    fun observeByCompany(companyId: String): Flow<List<UserEntity>>
 
-    @Query("UPDATE users SET isActive = :isActive, isSynced = 0, updatedAt = :updatedAt WHERE id = :userId")
-    suspend fun updateActiveStatus(userId: String, isActive: Boolean, updatedAt: Long)
+    @Query(
+        "UPDATE users SET isActive = :isActive, isSynced = 0, updatedAt = :updatedAt " +
+            "WHERE id = :userId AND companyId = :companyId"
+    )
+    suspend fun updateActiveStatus(
+        userId: String,
+        companyId: String,
+        isActive: Boolean,
+        updatedAt: Long
+    )
 
-    @Query("SELECT * FROM users WHERE isSynced = 0")
-    suspend fun getUnsynced(): List<UserEntity>
+    @Query(
+        "UPDATE users SET companyId = :companyId, isSynced = 0, updatedAt = :updatedAt " +
+            "WHERE id = :userId"
+    )
+    suspend fun updateCompanyId(
+        userId: String,
+        companyId: String,
+        updatedAt: Long
+    )
+
+    @Query(
+        "UPDATE users SET passwordHash = :passwordHash, mustChangePassword = 0, " +
+            "isSynced = 0, updatedAt = :updatedAt WHERE id = :userId"
+    )
+    suspend fun updatePasswordAndClearForceChange(
+        userId: String,
+        passwordHash: String,
+        updatedAt: Long
+    )
+
+    @Query("DELETE FROM users WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("SELECT * FROM users WHERE companyId = :companyId AND isSynced = 0")
+    suspend fun getUnsyncedByCompany(companyId: String): List<UserEntity>
 
     @Query("UPDATE users SET isSynced = 1, updatedAt = :syncedAt WHERE id = :id")
     suspend fun markSynced(id: String, syncedAt: Long)
 
-    @Query("SELECT COUNT(*) FROM users WHERE isSynced = 0")
-    fun observeUnsyncedCount(): Flow<Int>
+    @Query("SELECT COUNT(*) FROM users WHERE companyId = :companyId AND isSynced = 0")
+    fun observeUnsyncedCountByCompany(companyId: String): Flow<Int>
 }

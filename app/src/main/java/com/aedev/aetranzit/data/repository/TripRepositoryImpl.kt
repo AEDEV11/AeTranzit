@@ -11,10 +11,15 @@ import com.aedev.aetranzit.domain.model.Trip
 import com.aedev.aetranzit.domain.model.TripStatus
 import com.aedev.aetranzit.domain.repository.SyncPreferencesRepository
 import com.aedev.aetranzit.domain.repository.TripRepository
+import com.aedev.aetranzit.domain.sync.NoOpSyncScheduler
+import com.aedev.aetranzit.domain.sync.SyncScheduler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -26,25 +31,66 @@ class TripRepositoryImpl @Inject constructor(
     private val tripDao: TripDao,
     private val busDao: BusDao,
     private val routeDao: RouteDao,
+    private val activeCompanyProvider: ActiveCompanyProvider,
     private val syncPreferencesRepository: SyncPreferencesRepository,
     private val fleetSyncDataSource: FleetSyncRemoteDataSource,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val syncScheduler: SyncScheduler = NoOpSyncScheduler
 ) : TripRepository {
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeAllTrips(): Flow<List<Trip>> =
-        tripDao.observeAll().map { list -> list.map { it.toDomain() } }
+        activeCompanyProvider.observeActiveCompanyId().flatMapLatest { companyId ->
+            if (companyId.isNullOrBlank()) {
+                flowOf(emptyList())
+            } else {
+                tripDao.observeByCompany(companyId).map { list ->
+                    list.map { it.toDomain() }
+                }
+            }
+        }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeTripById(tripId: String): Flow<Trip?> =
-        tripDao.observeById(tripId).map { it?.toDomain() }
+        activeCompanyProvider.observeActiveCompanyId().flatMapLatest { companyId ->
+            if (companyId.isNullOrBlank()) {
+                flowOf(null)
+            } else {
+                tripDao.observeByIdAndCompany(tripId, companyId).map { it?.toDomain() }
+            }
+        }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeActiveTrip(conductorId: String): Flow<Trip?> =
-        tripDao.observeActiveTripByConductor(conductorId).map { it?.toDomain() }
+        activeCompanyProvider.observeActiveCompanyId().flatMapLatest { companyId ->
+            if (companyId.isNullOrBlank()) {
+                flowOf(null)
+            } else {
+                tripDao.observeActiveTripByConductor(conductorId, companyId).map { it?.toDomain() }
+            }
+        }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeTripsByConductor(conductorId: String): Flow<List<Trip>> =
-        tripDao.observeByConductor(conductorId).map { list -> list.map { it.toDomain() } }
+        activeCompanyProvider.observeActiveCompanyId().flatMapLatest { companyId ->
+            if (companyId.isNullOrBlank()) {
+                flowOf(emptyList())
+            } else {
+                tripDao.observeByConductor(conductorId, companyId).map { list ->
+                    list.map { it.toDomain() }
+                }
+            }
+        }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeUnsyncedCount(): Flow<Int> =
-        tripDao.observeUnsyncedCount()
+        activeCompanyProvider.observeActiveCompanyId().flatMapLatest { companyId ->
+            if (companyId.isNullOrBlank()) {
+                flowOf(0)
+            } else {
+                tripDao.observeUnsyncedCountByCompany(companyId)
+            }
+        }
 
     override suspend fun startTrip(
         conductorId: String,
@@ -52,6 +98,7 @@ class TripRepositoryImpl @Inject constructor(
         routeId: String
     ): Result<Trip> = withContext(ioDispatcher) {
         try {
+            val companyId = activeCompanyProvider.requireActiveCompanyId()
             if (conductorId.isBlank()) {
                 return@withContext Result.failure(
                     IllegalArgumentException("No authenticated conductor found.")
@@ -64,21 +111,25 @@ class TripRepositoryImpl @Inject constructor(
                 return@withContext Result.failure(IllegalArgumentException("Please select a route."))
             }
 
-            if (tripDao.getActiveTripByConductor(conductorId) != null) {
+            if (tripDao.getActiveTripByConductor(conductorId, companyId) != null) {
                 return@withContext Result.failure(
                     IllegalStateException("You already have an active trip. End it before starting a new trip.")
                 )
             }
-            if (tripDao.countActiveTripsByBus(busId) > 0) {
+            if (busDao.getByIdAndCompany(busId, companyId) == null) {
+                return@withContext Result.failure(
+                    IllegalArgumentException("Selected bus does not exist in your company.")
+                )
+            }
+            if (routeDao.getByIdAndCompany(routeId, companyId) == null) {
+                return@withContext Result.failure(
+                    IllegalArgumentException("Selected route does not exist in your company.")
+                )
+            }
+            if (tripDao.countActiveTripsByBus(busId, companyId) > 0) {
                 return@withContext Result.failure(
                     IllegalStateException("Selected bus already has an active trip in progress.")
                 )
-            }
-            if (busDao.getById(busId) == null) {
-                return@withContext Result.failure(IllegalArgumentException("Selected bus no longer exists."))
-            }
-            if (routeDao.getById(routeId) == null) {
-                return@withContext Result.failure(IllegalArgumentException("Selected route no longer exists."))
             }
 
             val now = System.currentTimeMillis()
@@ -87,6 +138,7 @@ class TripRepositoryImpl @Inject constructor(
                 busId = busId,
                 routeId = routeId,
                 conductorId = conductorId,
+                companyId = companyId,
                 status = TripStatus.ACTIVE.name,
                 startedAt = now,
                 endedAt = null,
@@ -102,6 +154,7 @@ class TripRepositoryImpl @Inject constructor(
                     syncPreferencesRepository.updateLastSyncedAt(syncedAt)
                     entity = entity.copy(isSynced = true, updatedAt = syncedAt)
                 }
+                syncScheduler.enqueueImmediateSync()
             }
             Result.success(entity.toDomain())
         } catch (ce: CancellationException) {
@@ -113,7 +166,8 @@ class TripRepositoryImpl @Inject constructor(
 
     override suspend fun endTrip(tripId: String): Result<Trip> = withContext(ioDispatcher) {
         try {
-            val existing = tripDao.getById(tripId)
+            val companyId = activeCompanyProvider.requireActiveCompanyId()
+            val existing = tripDao.getByIdAndCompany(tripId, companyId)
                 ?: return@withContext Result.failure(IllegalArgumentException("Active trip not found."))
             if (TripStatus.fromRaw(existing.status) == TripStatus.COMPLETED) {
                 return@withContext Result.failure(IllegalStateException("Trip is already completed."))
@@ -135,6 +189,7 @@ class TripRepositoryImpl @Inject constructor(
                     syncPreferencesRepository.updateLastSyncedAt(syncedAt)
                     updated = updated.copy(isSynced = true, updatedAt = syncedAt)
                 }
+                syncScheduler.enqueueImmediateSync()
             }
             Result.success(updated.toDomain())
         } catch (ce: CancellationException) {
@@ -151,7 +206,10 @@ class TripRepositoryImpl @Inject constructor(
                     IllegalStateException("Enable Cloud Sync in Settings before syncing.")
                 )
             }
-            val unsynced = tripDao.getUnsynced()
+            val companyId = activeCompanyProvider.getActiveCompanyId()
+                ?: return@withContext Result.success(0)
+
+            val unsynced = tripDao.getUnsyncedByCompany(companyId)
             var syncedCount = 0
             for (trip in unsynced) {
                 if (fleetSyncDataSource.pushTrip(trip).isSuccess) {

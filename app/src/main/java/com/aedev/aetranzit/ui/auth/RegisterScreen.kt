@@ -1,9 +1,8 @@
 package com.aedev.aetranzit.ui.auth
 
-import androidx.compose.foundation.BorderStroke
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,14 +10,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AdminPanelSettings
-import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
@@ -31,7 +27,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,13 +36,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.aedev.aetranzit.domain.model.UserRole
+import com.aedev.aetranzit.domain.model.User
 import com.aedev.aetranzit.ui.components.AePrimaryButton
 import com.aedev.aetranzit.ui.components.AeTranzitBrandHeader
 import com.aedev.aetranzit.ui.theme.AeDimens
@@ -55,7 +51,7 @@ import com.aedev.aetranzit.ui.theme.AeTranzitTheme
 
 @Composable
 fun RegisterScreen(
-    onAuthenticated: (UserRole) -> Unit,
+    onAuthenticated: (User) -> Unit,
     onNavigateBackToLogin: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
@@ -64,7 +60,7 @@ fun RegisterScreen(
     LaunchedEffect(Unit) {
         viewModel.effects.collect { effect ->
             when (effect) {
-                is AuthEffect.Authenticated -> onAuthenticated(effect.user.role)
+                is AuthEffect.Authenticated -> onAuthenticated(effect.user)
             }
         }
     }
@@ -100,8 +96,8 @@ fun RegisterContent(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             AeTranzitBrandHeader(
-                title = "Create Staff Account",
-                subtitle = "Works 100% offline with optional cloud sync"
+                title = "Create Admin Account",
+                subtitle = "Register as a bus operator Admin — set up your business next"
             )
 
             Spacer(modifier = Modifier.height(AeDimens.SpaceLg))
@@ -117,33 +113,6 @@ fun RegisterContent(
                         .fillMaxWidth()
                         .padding(AeDimens.SpaceMd)
                 ) {
-                    Text(
-                        text = "Select Role",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(AeDimens.SpaceSm))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
-                    ) {
-                        RoleSelectorChip(
-                            role = UserRole.CONDUCTOR,
-                            selected = uiState.selectedRole == UserRole.CONDUCTOR,
-                            onClick = { onEvent(AuthUiEvent.RoleSelected(UserRole.CONDUCTOR)) },
-                            modifier = Modifier.weight(1f)
-                        )
-                        RoleSelectorChip(
-                            role = UserRole.ADMIN,
-                            selected = uiState.selectedRole == UserRole.ADMIN,
-                            onClick = { onEvent(AuthUiEvent.RoleSelected(UserRole.ADMIN)) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(AeDimens.SpaceMd))
-
                     OutlinedTextField(
                         value = uiState.name,
                         onValueChange = { onEvent(AuthUiEvent.NameChanged(it)) },
@@ -152,7 +121,10 @@ fun RegisterContent(
                         isError = uiState.nameError != null,
                         supportingText = uiState.nameError?.let { error -> { Text(error) } },
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Words,
+                            imeAction = ImeAction.Next
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -254,7 +226,7 @@ fun RegisterContent(
                     Spacer(modifier = Modifier.height(AeDimens.SpaceMd))
 
                     AePrimaryButton(
-                        text = "Register ${uiState.selectedRole.displayName}",
+                        text = "Create Admin Account",
                         isLoading = uiState.isLoading,
                         onClick = {
                             focusManager.clearFocus()
@@ -272,7 +244,7 @@ fun RegisterContent(
                 modifier = Modifier.heightIn(min = AeDimens.MinTouchTarget)
             ) {
                 Text(
-                    text = "Already registered? Sign In",
+                    text = "Already have an account? Sign In",
                     style = MaterialTheme.typography.labelLarge
                 )
             }
@@ -280,70 +252,31 @@ fun RegisterContent(
     }
 }
 
+@Preview(showBackground = true, name = "Register Admin - Default")
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES, name = "Register Admin - Dark")
 @Composable
-private fun RoleSelectorChip(
-    role: UserRole,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val containerColor = if (selected) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    val contentColor = if (selected) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val border = if (selected) {
-        BorderStroke(AeDimens.BorderWidth * 2, MaterialTheme.colorScheme.primary)
-    } else {
-        BorderStroke(AeDimens.BorderWidth, MaterialTheme.colorScheme.outline)
-    }
-
-    Surface(
-        onClick = onClick,
-        shape = MaterialTheme.shapes.medium,
-        color = containerColor,
-        contentColor = contentColor,
-        border = border,
-        modifier = modifier.heightIn(min = AeDimens.MinTouchTarget)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = AeDimens.SpaceMd, vertical = AeDimens.SpaceSm),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = if (role == UserRole.ADMIN) {
-                    Icons.Default.AdminPanelSettings
-                } else {
-                    Icons.Default.Badge
-                },
-                contentDescription = null
-            )
-            Spacer(modifier = Modifier.width(AeDimens.SpaceSm))
-            Text(
-                text = role.displayName,
-                style = MaterialTheme.typography.labelLarge
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun RegisterContentPreview() {
+private fun RegisterAdminPreview() {
     AeTranzitTheme {
         RegisterContent(
             uiState = AuthUiState(
-                name = "Juan Dela Cruz",
-                email = "juan@aetranzit.com",
-                selectedRole = UserRole.ADMIN
+                name = "Maria Santos",
+                email = "maria@victoryliner.ph"
+            ),
+            onEvent = {},
+            onNavigateBackToLogin = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Register Admin - Validation Error")
+@Composable
+private fun RegisterAdminErrorPreview() {
+    AeTranzitTheme {
+        RegisterContent(
+            uiState = AuthUiState(
+                name = "Maria Santos",
+                email = "maria@victoryliner.ph",
+                confirmPasswordError = "Passwords do not match."
             ),
             onEvent = {},
             onNavigateBackToLogin = {}

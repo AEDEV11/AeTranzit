@@ -16,6 +16,7 @@ import androidx.core.graphics.createBitmap
 import androidx.core.graphics.withClip
 import com.aedev.aetranzit.R
 import com.aedev.aetranzit.di.DefaultDispatcher
+import com.aedev.aetranzit.domain.model.Company
 import com.aedev.aetranzit.ui.theme.BlueContainerLight
 import com.aedev.aetranzit.ui.theme.BlueOnContainerLight
 import com.aedev.aetranzit.ui.theme.DeepNavy
@@ -36,6 +37,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 data class DigitalTicketRenderData(
+    val companyName: String = Company.FALLBACK_BRAND_NAME,
     val referenceCode: String,
     val statusLabel: String,
     val isDroppedOff: Boolean,
@@ -140,21 +142,6 @@ class DigitalTicketBitmapRenderer @Inject constructor(
             canvas.drawBitmap(rawLogo, null, dstRect, Paint(Paint.FILTER_BITMAP_FLAG))
         }
 
-        val brandTitlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = TicketPaperBackground.toArgb()
-            textSize = 44f
-            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-        }
-        val brandSubtitlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = TransitTealDark.toArgb()
-            textSize = 24f
-            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-            letterSpacing = 0.06f
-        }
-        val textStartX = logoLeft + logoSize + 28f
-        canvas.drawText("AeTranzit", textStartX, cardRect.top + 88f, brandTitlePaint)
-        canvas.drawText("DIGITAL BUS TICKET", textStartX, cardRect.top + 132f, brandSubtitlePaint)
-
         // Status Pill (top-right)
         val statusText = data.statusLabel.uppercase()
         val statusTextPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -183,6 +170,29 @@ class DigitalTicketBitmapRenderer @Inject constructor(
             pillTop + 36f,
             statusTextPaint
         )
+
+        val brandTitlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = TicketPaperBackground.toArgb()
+            textSize = 42f
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        }
+        val brandSubtitlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = TransitTealDark.toArgb()
+            textSize = 22f
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+            letterSpacing = 0.06f
+        }
+        val textStartX = logoLeft + logoSize + 28f
+        val maxTitleWidth = (pillLeft - textStartX - 20f).coerceAtLeast(200f)
+        val resolvedBrand = data.companyName.trim().ifBlank { Company.FALLBACK_BRAND_NAME }
+        val ellipsizedBrand = TextUtils.ellipsize(
+            resolvedBrand,
+            brandTitlePaint,
+            maxTitleWidth,
+            TextUtils.TruncateAt.END
+        ).toString()
+        canvas.drawText(ellipsizedBrand, textStartX, cardRect.top + 88f, brandTitlePaint)
+        canvas.drawText("DIGITAL BUS TICKET", textStartX, cardRect.top + 132f, brandSubtitlePaint)
 
         var cursorY = headerRect.bottom + 44f
         val contentLeft = cardRect.left + INNER_PADDING
@@ -329,7 +339,7 @@ class DigitalTicketBitmapRenderer @Inject constructor(
             typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
         }
         canvas.drawText(
-            "Scan QR to verify • Keep ticket until destination",
+            "Scan QR to verify • Powered by AeTranzit",
             CANVAS_WIDTH / 2f,
             qrRect.bottom + 46f,
             footerPaint

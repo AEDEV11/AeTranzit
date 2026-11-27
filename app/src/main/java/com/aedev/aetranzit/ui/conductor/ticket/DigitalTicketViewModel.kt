@@ -4,12 +4,14 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aedev.aetranzit.domain.model.Bus
+import com.aedev.aetranzit.domain.model.Company
 import com.aedev.aetranzit.domain.model.Route
 import com.aedev.aetranzit.domain.model.Ticket
 import com.aedev.aetranzit.domain.model.TicketStatus
 import com.aedev.aetranzit.domain.model.Trip
 import com.aedev.aetranzit.domain.repository.AuthRepository
 import com.aedev.aetranzit.domain.repository.BusRepository
+import com.aedev.aetranzit.domain.repository.CompanyRepository
 import com.aedev.aetranzit.domain.repository.RouteRepository
 import com.aedev.aetranzit.domain.repository.TicketRepository
 import com.aedev.aetranzit.domain.repository.TripRepository
@@ -31,6 +33,7 @@ import javax.inject.Inject
 data class DigitalTicketUiState(
     val ticketId: String = "",
     val isLoading: Boolean = true,
+    val companyName: String = Company.FALLBACK_BRAND_NAME,
     val ticket: Ticket? = null,
     val trip: Trip? = null,
     val bus: Bus? = null,
@@ -49,6 +52,7 @@ data class DigitalTicketUiState(
         val currentTicket = ticket ?: return null
         if (qrPayload.isBlank()) return null
         return DigitalTicketRenderData(
+            companyName = companyName,
             referenceCode = currentTicket.referenceCode,
             statusLabel = currentTicket.status.displayName,
             isDroppedOff = currentTicket.status == TicketStatus.DROPPED_OFF,
@@ -80,6 +84,7 @@ sealed interface DigitalTicketUiEvent {
 
 private data class TicketMetadataBundle(
     val isLoaded: Boolean,
+    val company: Company?,
     val ticket: Ticket?,
     val trip: Trip?,
     val bus: Bus?,
@@ -98,6 +103,7 @@ class DigitalTicketViewModel @Inject constructor(
     private val tripRepository: TripRepository,
     private val busRepository: BusRepository,
     private val routeRepository: RouteRepository,
+    private val companyRepository: CompanyRepository,
     authRepository: AuthRepository,
     private val payloadFormatter: TicketPayloadFormatter
 ) : ViewModel() {
@@ -112,6 +118,7 @@ class DigitalTicketViewModel @Inject constructor(
         flowOf(
             TicketMetadataBundle(
                 isLoaded = true,
+                company = null,
                 ticket = null,
                 trip = null,
                 bus = null,
@@ -124,6 +131,7 @@ class DigitalTicketViewModel @Inject constructor(
                 flowOf(
                     TicketMetadataBundle(
                         isLoaded = true,
+                        company = null,
                         ticket = null,
                         trip = null,
                         bus = null,
@@ -131,6 +139,12 @@ class DigitalTicketViewModel @Inject constructor(
                     )
                 )
             } else {
+                val companyFlow = if (ticket.companyId.isBlank()) {
+                    companyRepository.observeActiveCompany()
+                } else {
+                    companyRepository.observeCompanyById(ticket.companyId)
+                }
+
                 tripRepository.observeTripById(ticket.tripId).flatMapLatest { trip ->
                     val resolvedBusId = trip?.busId?.ifBlank { ticket.busId } ?: ticket.busId
                     val busFlow = if (resolvedBusId.isBlank()) {
@@ -143,9 +157,10 @@ class DigitalTicketViewModel @Inject constructor(
                     } else {
                         routeRepository.observeRouteById(trip.routeId)
                     }
-                    combine(busFlow, routeFlow) { bus, route ->
+                    combine(companyFlow, busFlow, routeFlow) { company, bus, route ->
                         TicketMetadataBundle(
                             isLoaded = true,
+                            company = company,
                             ticket = ticket,
                             trip = trip,
                             bus = bus,
@@ -163,6 +178,8 @@ class DigitalTicketViewModel @Inject constructor(
         actionState
     ) { bundle, currentUser, action ->
         val ticket = bundle.ticket
+        val companyName = bundle.company?.name?.trim()?.ifBlank { Company.FALLBACK_BRAND_NAME }
+            ?: Company.FALLBACK_BRAND_NAME
         val busNumber = bundle.bus?.busNumber?.trim()?.ifBlank { "N/A" } ?: "N/A"
         val plateNumber = bundle.bus?.plateNumber?.trim()?.ifBlank { "N/A" } ?: "N/A"
         val routeLabel = bundle.route?.displayName?.trim()?.ifBlank { "N/A" } ?: "N/A"
@@ -193,6 +210,7 @@ class DigitalTicketViewModel @Inject constructor(
             )
             val smsReceiptText = payloadFormatter.buildSmsReceiptText(
                 ticket = ticket,
+                companyName = companyName,
                 busNumber = busNumber,
                 plateNumber = plateNumber,
                 routeLabel = routeLabel,
@@ -201,6 +219,7 @@ class DigitalTicketViewModel @Inject constructor(
             DigitalTicketUiState(
                 ticketId = ticketId,
                 isLoading = false,
+                companyName = companyName,
                 ticket = ticket,
                 trip = bundle.trip,
                 bus = bundle.bus,

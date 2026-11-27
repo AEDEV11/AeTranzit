@@ -59,6 +59,8 @@ import com.aedev.aetranzit.domain.usecase.AnalyticsDateRange
 import com.aedev.aetranzit.domain.usecase.ConductorPerformanceStat
 import com.aedev.aetranzit.domain.usecase.DailyRevenuePoint
 import com.aedev.aetranzit.domain.usecase.DestinationRevenueStat
+import com.aedev.aetranzit.ui.components.SyncBadgeUiState
+import com.aedev.aetranzit.ui.components.SyncStatusBadge
 import com.aedev.aetranzit.ui.components.formatPhp
 import com.aedev.aetranzit.ui.theme.AeDimens
 import com.aedev.aetranzit.ui.theme.AeTranzitTheme
@@ -87,12 +89,14 @@ fun AdminDashboardScreen(
     onOpenSettings: () -> Unit,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier,
+    syncBadgeState: SyncBadgeUiState = SyncBadgeUiState(),
     viewModel: AdminDashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     AdminDashboardContent(
         userName = userName,
         isCloudSyncEnabled = isCloudSyncEnabled,
+        syncBadgeState = syncBadgeState,
         uiState = uiState,
         onSelectDateRange = viewModel::onSelectDateRange,
         onOpenReports = onOpenReports,
@@ -117,7 +121,8 @@ fun AdminDashboardContent(
     onOpenManageRoutes: () -> Unit,
     onOpenSettings: () -> Unit,
     onLogout: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    syncBadgeState: SyncBadgeUiState = SyncBadgeUiState()
 ) {
     val analytics = uiState.analytics
 
@@ -125,7 +130,21 @@ fun AdminDashboardContent(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Admin Operations Hub") },
+                title = {
+                    Column {
+                        Text(
+                            text = uiState.companyName,
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "Admin Operations Hub",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
                 actions = {
                     IconButton(
                         onClick = onOpenSettings,
@@ -153,7 +172,9 @@ fun AdminDashboardContent(
         ) {
             AdminWelcomeHeaderCard(
                 userName = userName,
-                isCloudSyncEnabled = isCloudSyncEnabled
+                companyName = uiState.companyName,
+                syncBadgeState = syncBadgeState.copy(isCloudSyncEnabled = isCloudSyncEnabled),
+                onOpenSettings = onOpenSettings
             )
 
             DateRangeFilterBar(
@@ -191,7 +212,7 @@ fun AdminDashboardContent(
 
             AdminActionCard(
                 title = "Manage Staff",
-                subtitle = "View registered Admins & Conductors and activate or deactivate accounts",
+                subtitle = "Provision Conductors & Co-Admins and activate or deactivate accounts",
                 countBadge = "${uiState.totalStaff}",
                 countLabel = "${uiState.activeConductorsCount} Active",
                 icon = Icons.Default.Badge,
@@ -232,7 +253,9 @@ fun AdminDashboardContent(
 @Composable
 private fun AdminWelcomeHeaderCard(
     userName: String,
-    isCloudSyncEnabled: Boolean
+    companyName: String,
+    syncBadgeState: SyncBadgeUiState,
+    onOpenSettings: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -243,9 +266,11 @@ private fun AdminWelcomeHeaderCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(AeDimens.SpaceMd)
+                .padding(AeDimens.SpaceMd),
+            verticalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
         ) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(AeDimens.SpaceSm)
             ) {
@@ -254,18 +279,26 @@ private fun AdminWelcomeHeaderCard(
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                 )
-                Text(
-                    text = "Welcome, $userName",
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = companyName,
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "Welcome, $userName",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(AeDimens.SpaceXs))
-            Text(
-                text = "Role: Admin • Sync: ${if (isCloudSyncEnabled) "Cloud Enabled" else "Offline Only (Room SSOT)"}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+
+            SyncStatusBadge(
+                state = syncBadgeState,
+                onClick = onOpenSettings
             )
         }
     }
@@ -856,6 +889,8 @@ private fun AdminDashboardContentPreview() {
             userName = "Maria Santos",
             isCloudSyncEnabled = true,
             uiState = AdminDashboardUiState(
+                companyName = "Victory Liner",
+                companyJoinCode = "VIC-4821",
                 selectedDateRange = AnalyticsDateRange.LAST_7_DAYS,
                 totalBuses = 4,
                 totalRoutes = 3,

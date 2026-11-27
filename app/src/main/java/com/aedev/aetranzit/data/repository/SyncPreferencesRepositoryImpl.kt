@@ -18,7 +18,7 @@ class SyncPreferencesRepositoryImpl @Inject constructor(
 ) : SyncPreferencesRepository {
 
     override val isCloudSyncEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
-        prefs[KEY_CLOUD_SYNC_ENABLED] ?: false
+        prefs[KEY_CLOUD_SYNC_ENABLED] ?: true
     }
 
     override val lastSyncedAt: Flow<Long?> = dataStore.data.map { prefs ->

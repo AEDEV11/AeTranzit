@@ -1,8 +1,10 @@
 package com.aedev.aetranzit.ui.admin.staff
 
+import com.aedev.aetranzit.domain.model.Company
 import com.aedev.aetranzit.domain.model.User
 import com.aedev.aetranzit.domain.model.UserRole
 import com.aedev.aetranzit.domain.repository.AuthRepository
+import com.aedev.aetranzit.domain.repository.CompanyRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +20,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -27,18 +30,46 @@ class ManageStaffViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var fakeAuthRepository: FakeStaffAuthRepository
+    private lateinit var fakeCompanyRepository: FakeStaffCompanyRepository
     private lateinit var viewModel: ManageStaffViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         fakeAuthRepository = FakeStaffAuthRepository()
-        viewModel = ManageStaffViewModel(fakeAuthRepository)
+        fakeCompanyRepository = FakeStaffCompanyRepository()
+        viewModel = ManageStaffViewModel(fakeAuthRepository, fakeCompanyRepository)
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `provisions new Conductor account with generated temporary password and exposes Copy Credentials summary`() = runTest {
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect()
+        }
+        advanceUntilIdle()
+
+        viewModel.onOpenAddStaffSheet()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.addStaffForm.isSheetVisible)
+        assertTrue(viewModel.uiState.value.addStaffForm.temporaryPassword.length >= 6)
+
+        val generatedPassword = viewModel.uiState.value.addStaffForm.temporaryPassword
+        viewModel.onStaffNameChanged("Juan Luna")
+        viewModel.onStaffEmailChanged("juan@victory.ph")
+        viewModel.onSubmitCreateStaff()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.addStaffForm.isSheetVisible)
+        assertNotNull(state.createdCredentials)
+        assertEquals("juan@victory.ph", state.createdCredentials?.email)
+        assertEquals(generatedPassword, state.createdCredentials?.temporaryPassword)
+        assertTrue(state.staffMembers.any { it.email == "juan@victory.ph" && it.mustChangePassword })
     }
 
     @Test
@@ -86,12 +117,36 @@ class ManageStaffViewModelTest {
     }
 }
 
+private class FakeStaffCompanyRepository : CompanyRepository {
+    private val company = Company(
+        id = "company-1",
+        name = "Victory Liner",
+        joinCode = "VIC-4821",
+        createdAt = 1_000L,
+        isSynced = true,
+        updatedAt = 1_000L
+    )
+    private val activeFlow = MutableStateFlow<Company?>(company)
+
+    override fun observeActiveCompany(): Flow<Company?> = activeFlow
+    override fun observeCompanyById(companyId: String): Flow<Company?> =
+        MutableStateFlow(company.takeIf { it.id == companyId })
+    override fun observeUnsyncedCount(): Flow<Int> = MutableStateFlow(0)
+    override suspend fun getActiveCompany(): Company? = activeFlow.value
+    override suspend fun getCompanyById(companyId: String): Company? =
+        company.takeIf { it.id == companyId }
+    override suspend fun findByJoinCode(joinCode: String): Result<Company?> =
+        Result.success(company.takeIf { it.joinCode == joinCode })
+    override suspend fun syncPendingCompanies(): Result<Int> = Result.success(0)
+}
+
 private class FakeStaffAuthRepository : AuthRepository {
     private val adminUser = User(
         id = "admin-1",
         name = "Maria Santos",
         email = "maria@aetranzit.ph",
         role = UserRole.ADMIN,
+        companyId = "company-1",
         isActive = true,
         isSynced = true,
         updatedAt = 1_000L
@@ -102,6 +157,7 @@ private class FakeStaffAuthRepository : AuthRepository {
         name = "Ramon Magsaysay",
         email = "ramon@aetranzit.ph",
         role = UserRole.CONDUCTOR,
+        companyId = "company-1",
         isActive = true,
         isSynced = true,
         updatedAt = 1_000L
@@ -127,9 +183,35 @@ private class FakeStaffAuthRepository : AuthRepository {
     override suspend fun register(
         name: String,
         email: String,
-        password: String,
-        role: UserRole
+        password: String
     ): Result<User> = Result.success(adminUser)
+
+    override suspend fun completeCompanySetup(companyName: String): Result<User> =
+        Result.success(adminUser)
+
+    override suspend fun createStaffAccount(
+        name: String,
+        email: String,
+        temporaryPassword: String,
+        role: UserRole
+    ): Result<User> {
+        val created = User(
+            id = "staff-${allUsersFlow.value.size + 1}",
+            name = name,
+            email = email,
+            role = role,
+            companyId = "company-1",
+            isActive = true,
+            mustChangePassword = true,
+            isSynced = true,
+            updatedAt = 2_000L
+        )
+        allUsersFlow.value = allUsersFlow.value + created
+        return Result.success(created)
+    }
+
+    override suspend fun completeForcedPasswordChange(newPassword: String): Result<User> =
+        Result.failure(UnsupportedOperationException())
 
     override suspend fun setUserActiveStatus(userId: String, isActive: Boolean): Result<Unit> {
         setStatusCallCount++

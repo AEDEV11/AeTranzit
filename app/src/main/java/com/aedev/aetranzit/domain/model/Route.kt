@@ -6,6 +6,7 @@ data class Route(
     val destination: String,
     val baseFare: Double,
     val stops: List<RouteStop>,
+    val companyId: String = Company.DEFAULT_COMPANY_ID,
     val isSynced: Boolean,
     val updatedAt: Long
 ) {

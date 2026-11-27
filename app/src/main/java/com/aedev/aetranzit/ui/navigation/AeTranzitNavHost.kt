@@ -12,12 +12,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.aedev.aetranzit.domain.model.User
 import com.aedev.aetranzit.domain.model.UserRole
 import com.aedev.aetranzit.ui.admin.AdminDashboardScreen
 import com.aedev.aetranzit.ui.admin.ManageBusesScreen
 import com.aedev.aetranzit.ui.admin.ManageRoutesScreen
 import com.aedev.aetranzit.ui.admin.reports.AdminReportsScreen
+import com.aedev.aetranzit.ui.admin.setup.CompanySetupScreen
 import com.aedev.aetranzit.ui.admin.staff.ManageStaffScreen
+import com.aedev.aetranzit.ui.auth.ForceChangePasswordScreen
 import com.aedev.aetranzit.ui.auth.LoginScreen
 import com.aedev.aetranzit.ui.auth.RegisterScreen
 import com.aedev.aetranzit.ui.auth.SplashScreen
@@ -34,8 +37,8 @@ fun AeTranzitNavHost(
 ) {
     val sessionState by sessionViewModel.sessionState.collectAsStateWithLifecycle()
 
-    val navigateToRoleHome: (UserRole) -> Unit = { role ->
-        val target = AeTranzitRoutes.homeRouteFor(role)
+    val navigateToPostAuth: (User) -> Unit = { user ->
+        val target = AeTranzitRoutes.postAuthRouteFor(user)
         navController.navigate(target) {
             popUpTo(navController.graph.id) { inclusive = true }
             launchSingleTop = true
@@ -57,13 +60,13 @@ fun AeTranzitNavHost(
         composable(AeTranzitRoutes.SPLASH) {
             SplashScreen(
                 onNavigateToLogin = navigateToLoginReset,
-                onNavigateToRoleHome = navigateToRoleHome
+                onAuthenticated = navigateToPostAuth
             )
         }
 
         composable(AeTranzitRoutes.LOGIN) {
             LoginScreen(
-                onAuthenticated = navigateToRoleHome,
+                onAuthenticated = navigateToPostAuth,
                 onNavigateToRegister = {
                     navController.navigate(AeTranzitRoutes.REGISTER) {
                         launchSingleTop = true
@@ -74,20 +77,67 @@ fun AeTranzitNavHost(
 
         composable(AeTranzitRoutes.REGISTER) {
             RegisterScreen(
-                onAuthenticated = navigateToRoleHome,
+                onAuthenticated = navigateToPostAuth,
                 onNavigateBackToLogin = { navController.popBackStack() }
             )
         }
 
+        composable(AeTranzitRoutes.COMPANY_SETUP) {
+            val currentUser = sessionState.currentUser
+            if (currentUser != null &&
+                (currentUser.role != UserRole.ADMIN ||
+                    currentUser.mustChangePassword ||
+                    currentUser.companyId.isNotBlank())
+            ) {
+                LaunchedEffect(
+                    currentUser.id,
+                    currentUser.role,
+                    currentUser.companyId,
+                    currentUser.mustChangePassword
+                ) {
+                    navigateToPostAuth(currentUser)
+                }
+                return@composable
+            }
+            CompanySetupScreen(
+                onSetupCompleted = navigateToPostAuth,
+                onLoggedOut = navigateToLoginReset
+            )
+        }
+
+        composable(AeTranzitRoutes.FORCE_CHANGE_PASSWORD) {
+            val currentUser = sessionState.currentUser
+            if (currentUser != null && !currentUser.mustChangePassword) {
+                LaunchedEffect(currentUser.id, currentUser.mustChangePassword) {
+                    navigateToPostAuth(currentUser)
+                }
+                return@composable
+            }
+            ForceChangePasswordScreen(
+                onPasswordChanged = navigateToPostAuth,
+                onLoggedOut = navigateToLoginReset
+            )
+        }
+
         composable(AeTranzitRoutes.ADMIN_DASHBOARD) {
-            val currentRole = sessionState.currentUser?.role
-            if (currentRole != null && currentRole != UserRole.ADMIN) {
-                LaunchedEffect(currentRole) { navigateToRoleHome(currentRole) }
+            val currentUser = sessionState.currentUser
+            if (currentUser != null &&
+                AeTranzitRoutes.postAuthRouteFor(currentUser) != AeTranzitRoutes.ADMIN_DASHBOARD
+            ) {
+                LaunchedEffect(
+                    currentUser.id,
+                    currentUser.role,
+                    currentUser.companyId,
+                    currentUser.mustChangePassword
+                ) {
+                    navigateToPostAuth(currentUser)
+                }
                 return@composable
             }
             AdminDashboardScreen(
-                userName = sessionState.currentUser?.name ?: "Admin",
+                userName = currentUser?.name ?: "Admin",
                 isCloudSyncEnabled = sessionState.isCloudSyncEnabled,
+                syncBadgeState = sessionState.syncBadgeState,
                 onOpenReports = {
                     navController.navigate(AeTranzitRoutes.ADMIN_REPORTS) {
                         launchSingleTop = true
@@ -118,9 +168,18 @@ fun AeTranzitNavHost(
         }
 
         composable(AeTranzitRoutes.ADMIN_REPORTS) {
-            val currentRole = sessionState.currentUser?.role
-            if (currentRole != null && currentRole != UserRole.ADMIN) {
-                LaunchedEffect(currentRole) { navigateToRoleHome(currentRole) }
+            val currentUser = sessionState.currentUser
+            if (currentUser != null &&
+                AeTranzitRoutes.postAuthRouteFor(currentUser) != AeTranzitRoutes.ADMIN_DASHBOARD
+            ) {
+                LaunchedEffect(
+                    currentUser.id,
+                    currentUser.role,
+                    currentUser.companyId,
+                    currentUser.mustChangePassword
+                ) {
+                    navigateToPostAuth(currentUser)
+                }
                 return@composable
             }
             AdminReportsScreen(
@@ -129,9 +188,18 @@ fun AeTranzitNavHost(
         }
 
         composable(AeTranzitRoutes.ADMIN_STAFF) {
-            val currentRole = sessionState.currentUser?.role
-            if (currentRole != null && currentRole != UserRole.ADMIN) {
-                LaunchedEffect(currentRole) { navigateToRoleHome(currentRole) }
+            val currentUser = sessionState.currentUser
+            if (currentUser != null &&
+                AeTranzitRoutes.postAuthRouteFor(currentUser) != AeTranzitRoutes.ADMIN_DASHBOARD
+            ) {
+                LaunchedEffect(
+                    currentUser.id,
+                    currentUser.role,
+                    currentUser.companyId,
+                    currentUser.mustChangePassword
+                ) {
+                    navigateToPostAuth(currentUser)
+                }
                 return@composable
             }
             ManageStaffScreen(
@@ -140,9 +208,18 @@ fun AeTranzitNavHost(
         }
 
         composable(AeTranzitRoutes.ADMIN_BUSES) {
-            val currentRole = sessionState.currentUser?.role
-            if (currentRole != null && currentRole != UserRole.ADMIN) {
-                LaunchedEffect(currentRole) { navigateToRoleHome(currentRole) }
+            val currentUser = sessionState.currentUser
+            if (currentUser != null &&
+                AeTranzitRoutes.postAuthRouteFor(currentUser) != AeTranzitRoutes.ADMIN_DASHBOARD
+            ) {
+                LaunchedEffect(
+                    currentUser.id,
+                    currentUser.role,
+                    currentUser.companyId,
+                    currentUser.mustChangePassword
+                ) {
+                    navigateToPostAuth(currentUser)
+                }
                 return@composable
             }
             ManageBusesScreen(
@@ -151,9 +228,18 @@ fun AeTranzitNavHost(
         }
 
         composable(AeTranzitRoutes.ADMIN_ROUTES) {
-            val currentRole = sessionState.currentUser?.role
-            if (currentRole != null && currentRole != UserRole.ADMIN) {
-                LaunchedEffect(currentRole) { navigateToRoleHome(currentRole) }
+            val currentUser = sessionState.currentUser
+            if (currentUser != null &&
+                AeTranzitRoutes.postAuthRouteFor(currentUser) != AeTranzitRoutes.ADMIN_DASHBOARD
+            ) {
+                LaunchedEffect(
+                    currentUser.id,
+                    currentUser.role,
+                    currentUser.companyId,
+                    currentUser.mustChangePassword
+                ) {
+                    navigateToPostAuth(currentUser)
+                }
                 return@composable
             }
             ManageRoutesScreen(
@@ -162,14 +248,23 @@ fun AeTranzitNavHost(
         }
 
         composable(AeTranzitRoutes.CONDUCTOR_HOME) {
-            val currentRole = sessionState.currentUser?.role
-            if (currentRole != null && currentRole != UserRole.CONDUCTOR) {
-                LaunchedEffect(currentRole) { navigateToRoleHome(currentRole) }
+            val currentUser = sessionState.currentUser
+            if (currentUser != null &&
+                AeTranzitRoutes.postAuthRouteFor(currentUser) != AeTranzitRoutes.CONDUCTOR_HOME
+            ) {
+                LaunchedEffect(
+                    currentUser.id,
+                    currentUser.role,
+                    currentUser.mustChangePassword
+                ) {
+                    navigateToPostAuth(currentUser)
+                }
                 return@composable
             }
             ConductorHomeScreen(
-                userName = sessionState.currentUser?.name ?: "Conductor",
+                userName = currentUser?.name ?: "Conductor",
                 isCloudSyncEnabled = sessionState.isCloudSyncEnabled,
+                syncBadgeState = sessionState.syncBadgeState,
                 onOpenTicketing = { tripId ->
                     navController.navigate(AeTranzitRoutes.conductorTicketingRoute(tripId)) {
                         launchSingleTop = true
@@ -188,15 +283,29 @@ fun AeTranzitNavHost(
             route = AeTranzitRoutes.CONDUCTOR_TICKETING,
             arguments = listOf(navArgument(AeTranzitRoutes.ARG_TRIP_ID) { type = NavType.StringType })
         ) {
-            val currentRole = sessionState.currentUser?.role
-            if (currentRole != null && currentRole != UserRole.CONDUCTOR) {
-                LaunchedEffect(currentRole) { navigateToRoleHome(currentRole) }
+            val currentUser = sessionState.currentUser
+            if (currentUser != null &&
+                AeTranzitRoutes.postAuthRouteFor(currentUser) != AeTranzitRoutes.CONDUCTOR_HOME
+            ) {
+                LaunchedEffect(
+                    currentUser.id,
+                    currentUser.role,
+                    currentUser.mustChangePassword
+                ) {
+                    navigateToPostAuth(currentUser)
+                }
                 return@composable
             }
             ConductorTicketingScreen(
+                syncBadgeState = sessionState.syncBadgeState,
                 onNavigateBack = { navController.popBackStack() },
                 onOpenDigitalTicket = { ticketId ->
                     navController.navigate(AeTranzitRoutes.conductorDigitalTicketRoute(ticketId)) {
+                        launchSingleTop = true
+                    }
+                },
+                onOpenSettings = {
+                    navController.navigate(AeTranzitRoutes.SETTINGS) {
                         launchSingleTop = true
                     }
                 }
@@ -207,9 +316,17 @@ fun AeTranzitNavHost(
             route = AeTranzitRoutes.CONDUCTOR_DIGITAL_TICKET,
             arguments = listOf(navArgument(AeTranzitRoutes.ARG_TICKET_ID) { type = NavType.StringType })
         ) {
-            val currentRole = sessionState.currentUser?.role
-            if (currentRole != null && currentRole != UserRole.CONDUCTOR) {
-                LaunchedEffect(currentRole) { navigateToRoleHome(currentRole) }
+            val currentUser = sessionState.currentUser
+            if (currentUser != null &&
+                AeTranzitRoutes.postAuthRouteFor(currentUser) != AeTranzitRoutes.CONDUCTOR_HOME
+            ) {
+                LaunchedEffect(
+                    currentUser.id,
+                    currentUser.role,
+                    currentUser.mustChangePassword
+                ) {
+                    navigateToPostAuth(currentUser)
+                }
                 return@composable
             }
             DigitalTicketScreen(
@@ -218,6 +335,20 @@ fun AeTranzitNavHost(
         }
 
         composable(AeTranzitRoutes.SETTINGS) {
+            val currentUser = sessionState.currentUser
+            if (currentUser != null &&
+                (currentUser.mustChangePassword ||
+                    (currentUser.role == UserRole.ADMIN && currentUser.companyId.isBlank()))
+            ) {
+                LaunchedEffect(
+                    currentUser.id,
+                    currentUser.companyId,
+                    currentUser.mustChangePassword
+                ) {
+                    navigateToPostAuth(currentUser)
+                }
+                return@composable
+            }
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() }
             )

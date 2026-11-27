@@ -4,10 +4,13 @@ import com.aedev.aetranzit.data.local.DatabaseTransactionRunner
 import com.aedev.aetranzit.data.local.dao.TicketDao
 import com.aedev.aetranzit.data.local.dao.TripDao
 import com.aedev.aetranzit.data.local.entity.BusEntity
+import com.aedev.aetranzit.data.local.entity.CompanyEntity
 import com.aedev.aetranzit.data.local.entity.RouteEntity
 import com.aedev.aetranzit.data.local.entity.TicketEntity
 import com.aedev.aetranzit.data.local.entity.TripEntity
+import com.aedev.aetranzit.data.local.entity.UserEntity
 import com.aedev.aetranzit.data.remote.FleetSyncRemoteDataSource
+import com.aedev.aetranzit.domain.model.Company
 import com.aedev.aetranzit.domain.model.PassengerType
 import com.aedev.aetranzit.domain.model.TicketStatus
 import com.aedev.aetranzit.domain.model.TripStatus
@@ -24,6 +27,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -33,6 +37,7 @@ class TicketRepositoryImplTest {
 
     private lateinit var ticketDao: FakeTicketDao
     private lateinit var tripDao: FakeTripDaoForTickets
+    private lateinit var companyProvider: MutableActiveCompanyProvider
     private lateinit var transactionRunner: MutexTransactionRunner
     private lateinit var syncPrefs: FakeTicketSyncPrefs
     private lateinit var remoteSync: RecordingFleetSyncDataSource
@@ -42,6 +47,7 @@ class TicketRepositoryImplTest {
     fun setUp() = runTest {
         ticketDao = FakeTicketDao()
         tripDao = FakeTripDaoForTickets()
+        companyProvider = MutableActiveCompanyProvider(Company.DEFAULT_COMPANY_ID)
         transactionRunner = MutexTransactionRunner()
         syncPrefs = FakeTicketSyncPrefs()
         remoteSync = RecordingFleetSyncDataSource()
@@ -52,6 +58,7 @@ class TicketRepositoryImplTest {
                 busId = "bus-101",
                 routeId = "route-1",
                 conductorId = "cond-1",
+                companyId = Company.DEFAULT_COMPANY_ID,
                 status = TripStatus.ACTIVE.name,
                 startedAt = 1_000L,
                 endedAt = null,
@@ -63,6 +70,7 @@ class TicketRepositoryImplTest {
         repository = TicketRepositoryImpl(
             ticketDao = ticketDao,
             tripDao = tripDao,
+            activeCompanyProvider = companyProvider,
             transactionRunner = transactionRunner,
             syncPreferencesRepository = syncPrefs,
             fleetSyncDataSource = remoteSync,
@@ -185,8 +193,94 @@ class TicketRepositoryImplTest {
         assertEquals(TicketStatus.DROPPED_OFF, afterDropOff?.status)
 
         val missing = repository.observeTicketById("unknown-ticket").first()
-        assertEquals(null, missing)
+        assertNull(missing)
     }
+
+    @Test
+    fun `multi-tenant isolation hides and blocks Company B tickets when active session is Company A`() = runTest {
+        companyProvider.setActiveCompanyId("company-a")
+        tripDao.upsert(
+            TripEntity(
+                id = "trip-a",
+                busId = "bus-a",
+                routeId = "route-a",
+                conductorId = "cond-a",
+                companyId = "company-a",
+                status = TripStatus.ACTIVE.name,
+                startedAt = 1_000L,
+                endedAt = null,
+                isSynced = false,
+                updatedAt = 1_000L
+            )
+        )
+        tripDao.upsert(
+            TripEntity(
+                id = "trip-b",
+                busId = "bus-b",
+                routeId = "route-b",
+                conductorId = "cond-b",
+                companyId = "company-b",
+                status = TripStatus.ACTIVE.name,
+                startedAt = 1_000L,
+                endedAt = null,
+                isSynced = false,
+                updatedAt = 1_000L
+            )
+        )
+
+        val ticketA = repository.issueTicket(
+            tripId = "trip-a",
+            seatNumber = "1",
+            destination = "Dau",
+            passengerType = PassengerType.REGULAR,
+            fareAmount = 150.0,
+            cashTendered = 200.0
+        ).getOrThrow()
+        assertEquals("company-a", ticketA.companyId)
+
+        // Company A cannot issue a ticket against Company B's trip
+        val crossTenantIssue = repository.issueTicket(
+            tripId = "trip-b",
+            seatNumber = "1",
+            destination = "Baguio",
+            passengerType = PassengerType.REGULAR,
+            fareAmount = 450.0,
+            cashTendered = 500.0
+        )
+        assertTrue(crossTenantIssue.isFailure)
+
+        // Switch session to Company B and issue a Company B ticket
+        companyProvider.setActiveCompanyId("company-b")
+        val ticketB = repository.issueTicket(
+            tripId = "trip-b",
+            seatNumber = "2",
+            destination = "Baguio",
+            passengerType = PassengerType.REGULAR,
+            fareAmount = 450.0,
+            cashTendered = 500.0
+        ).getOrThrow()
+        assertEquals("company-b", ticketB.companyId)
+
+        // Switch back to Company A: Company B's ticket is completely invisible & immutable
+        companyProvider.setActiveCompanyId("company-a")
+        val companyATickets = repository.observeAllTickets().first()
+        assertEquals(listOf(ticketA.id), companyATickets.map { it.id })
+        assertNull(repository.observeTicketById(ticketB.id).first())
+        assertTrue(repository.observeTicketsByTrip("trip-b").first().isEmpty())
+        assertTrue(repository.markPassengerDroppedOff(ticketB.id).isFailure)
+    }
+}
+
+private class MutableActiveCompanyProvider(initialCompanyId: String?) : ActiveCompanyProvider {
+    private val state = MutableStateFlow(initialCompanyId)
+
+    fun setActiveCompanyId(companyId: String?) {
+        state.value = companyId
+    }
+
+    override fun observeActiveCompanyId(): Flow<String?> = state
+
+    override suspend fun getActiveCompanyId(): String? = state.value
 }
 
 private class MutexTransactionRunner : DatabaseTransactionRunner {
@@ -203,35 +297,60 @@ private class FakeTicketDao : TicketDao {
         items.value = items.value.filterNot { it.id == ticket.id } + ticket
     }
 
-    override fun observeAll(): Flow<List<TicketEntity>> = items
+    override fun observeByCompany(companyId: String): Flow<List<TicketEntity>> =
+        items.map { list -> list.filter { it.companyId == companyId } }
 
-    override fun observeByTrip(tripId: String): Flow<List<TicketEntity>> =
-        items.map { list -> list.filter { it.tripId == tripId } }
+    override fun observeByTrip(tripId: String, companyId: String): Flow<List<TicketEntity>> =
+        items.map { list -> list.filter { it.tripId == tripId && it.companyId == companyId } }
 
-    override fun observeActiveTicketsByTrip(tripId: String): Flow<List<TicketEntity>> =
+    override fun observeActiveTicketsByTrip(
+        tripId: String,
+        companyId: String
+    ): Flow<List<TicketEntity>> =
         items.map { list ->
-            list.filter { it.tripId == tripId && it.status == TicketStatus.ACTIVE.name }
+            list.filter {
+                it.tripId == tripId &&
+                    it.companyId == companyId &&
+                    it.status == TicketStatus.ACTIVE.name
+            }
         }
 
-    override suspend fun getActiveTicketsByTrip(tripId: String): List<TicketEntity> =
-        items.value.filter { it.tripId == tripId && it.status == TicketStatus.ACTIVE.name }
-
-    override suspend fun getActiveTicketForSeat(tripId: String, seatNumber: String): TicketEntity? =
-        items.value.firstOrNull {
+    override suspend fun getActiveTicketsByTrip(
+        tripId: String,
+        companyId: String
+    ): List<TicketEntity> =
+        items.value.filter {
             it.tripId == tripId &&
-                it.seatNumber == seatNumber &&
+                it.companyId == companyId &&
                 it.status == TicketStatus.ACTIVE.name
         }
 
-    override suspend fun getById(id: String): TicketEntity? =
-        items.value.firstOrNull { it.id == id }
+    override suspend fun getActiveTicketForSeat(
+        tripId: String,
+        seatNumber: String,
+        companyId: String
+    ): TicketEntity? =
+        items.value.firstOrNull {
+            it.tripId == tripId &&
+                it.seatNumber == seatNumber &&
+                it.companyId == companyId &&
+                it.status == TicketStatus.ACTIVE.name
+        }
 
-    override fun observeById(id: String): Flow<TicketEntity?> =
-        items.map { list -> list.firstOrNull { it.id == id } }
+    override suspend fun getByIdAndCompany(id: String, companyId: String): TicketEntity? =
+        items.value.firstOrNull { it.id == id && it.companyId == companyId }
 
-    override suspend fun updateStatus(ticketId: String, status: String, updatedAt: Long) {
+    override fun observeByIdAndCompany(id: String, companyId: String): Flow<TicketEntity?> =
+        items.map { list -> list.firstOrNull { it.id == id && it.companyId == companyId } }
+
+    override suspend fun updateStatus(
+        ticketId: String,
+        companyId: String,
+        status: String,
+        updatedAt: Long
+    ) {
         items.value = items.value.map {
-            if (it.id == ticketId) {
+            if (it.id == ticketId && it.companyId == companyId) {
                 it.copy(status = status, isSynced = false, updatedAt = updatedAt)
             } else {
                 it
@@ -245,11 +364,11 @@ private class FakeTicketDao : TicketDao {
         }
     }
 
-    override suspend fun getUnsynced(): List<TicketEntity> =
-        items.value.filter { !it.isSynced }
+    override suspend fun getUnsyncedByCompany(companyId: String): List<TicketEntity> =
+        items.value.filter { it.companyId == companyId && !it.isSynced }
 
-    override fun observeUnsyncedCount(): Flow<Int> =
-        items.map { list -> list.count { !it.isSynced } }
+    override fun observeUnsyncedCountByCompany(companyId: String): Flow<Int> =
+        items.map { list -> list.count { it.companyId == companyId && !it.isSynced } }
 }
 
 private class FakeTripDaoForTickets : TripDao {
@@ -259,30 +378,54 @@ private class FakeTripDaoForTickets : TripDao {
         items.value = items.value.filterNot { it.id == trip.id } + trip
     }
 
-    override fun observeAll(): Flow<List<TripEntity>> = items
+    override fun observeByCompany(companyId: String): Flow<List<TripEntity>> =
+        items.map { list -> list.filter { it.companyId == companyId } }
 
-    override fun observeByConductor(conductorId: String): Flow<List<TripEntity>> =
-        items.map { list -> list.filter { it.conductorId == conductorId } }
-
-    override fun observeActiveTripByConductor(conductorId: String): Flow<TripEntity?> =
+    override fun observeByConductor(
+        conductorId: String,
+        companyId: String
+    ): Flow<List<TripEntity>> =
         items.map { list ->
-            list.firstOrNull { it.conductorId == conductorId && it.status == "ACTIVE" }
+            list.filter { it.conductorId == conductorId && it.companyId == companyId }
         }
 
-    override suspend fun getActiveTripByConductor(conductorId: String): TripEntity? =
-        items.value.firstOrNull { it.conductorId == conductorId && it.status == "ACTIVE" }
+    override fun observeActiveTripByConductor(
+        conductorId: String,
+        companyId: String
+    ): Flow<TripEntity?> =
+        items.map { list ->
+            list.firstOrNull {
+                it.conductorId == conductorId &&
+                    it.companyId == companyId &&
+                    it.status == "ACTIVE"
+            }
+        }
 
-    override suspend fun countActiveTripsByBus(busId: String): Int =
-        items.value.count { it.busId == busId && it.status == "ACTIVE" }
+    override suspend fun getActiveTripByConductor(
+        conductorId: String,
+        companyId: String
+    ): TripEntity? =
+        items.value.firstOrNull {
+            it.conductorId == conductorId &&
+                it.companyId == companyId &&
+                it.status == "ACTIVE"
+        }
 
-    override suspend fun countActiveTripsByRoute(routeId: String): Int =
-        items.value.count { it.routeId == routeId && it.status == "ACTIVE" }
+    override suspend fun countActiveTripsByBus(busId: String, companyId: String): Int =
+        items.value.count {
+            it.busId == busId && it.companyId == companyId && it.status == "ACTIVE"
+        }
 
-    override fun observeById(id: String): Flow<TripEntity?> =
-        items.map { list -> list.firstOrNull { it.id == id } }
+    override suspend fun countActiveTripsByRoute(routeId: String, companyId: String): Int =
+        items.value.count {
+            it.routeId == routeId && it.companyId == companyId && it.status == "ACTIVE"
+        }
 
-    override suspend fun getById(id: String): TripEntity? =
-        items.value.firstOrNull { it.id == id }
+    override fun observeByIdAndCompany(id: String, companyId: String): Flow<TripEntity?> =
+        items.map { list -> list.firstOrNull { it.id == id && it.companyId == companyId } }
+
+    override suspend fun getByIdAndCompany(id: String, companyId: String): TripEntity? =
+        items.value.firstOrNull { it.id == id && it.companyId == companyId }
 
     override suspend fun markSynced(id: String, syncedAt: Long) {
         items.value = items.value.map {
@@ -290,11 +433,11 @@ private class FakeTripDaoForTickets : TripDao {
         }
     }
 
-    override suspend fun getUnsynced(): List<TripEntity> =
-        items.value.filter { !it.isSynced }
+    override suspend fun getUnsyncedByCompany(companyId: String): List<TripEntity> =
+        items.value.filter { it.companyId == companyId && !it.isSynced }
 
-    override fun observeUnsyncedCount(): Flow<Int> =
-        items.map { list -> list.count { !it.isSynced } }
+    override fun observeUnsyncedCountByCompany(companyId: String): Flow<Int> =
+        items.map { list -> list.count { it.companyId == companyId && !it.isSynced } }
 }
 
 private class FakeTicketSyncPrefs : SyncPreferencesRepository {
@@ -322,6 +465,25 @@ private class FakeTicketSyncPrefs : SyncPreferencesRepository {
 private class RecordingFleetSyncDataSource : FleetSyncRemoteDataSource {
     var lastOccupiedSeats: List<String> = emptyList()
 
+    override suspend fun pushCompany(company: CompanyEntity): Result<Unit> = Result.success(Unit)
+    override suspend fun fetchCompanyByJoinCode(joinCode: String): Result<CompanyEntity?> =
+        Result.success(null)
+    override suspend fun fetchCompanyById(companyId: String): Result<CompanyEntity?> =
+        Result.success(null)
+    override suspend fun fetchUsersByCompany(companyId: String): Result<List<UserEntity>> =
+        Result.success(emptyList())
+    override suspend fun fetchBusesByCompany(companyId: String): Result<List<BusEntity>> =
+        Result.success(emptyList())
+    override suspend fun fetchRoutesByCompany(companyId: String): Result<List<RouteEntity>> =
+        Result.success(emptyList())
+    override suspend fun fetchTripsByCompany(
+        companyId: String,
+        conductorId: String?
+    ): Result<List<TripEntity>> = Result.success(emptyList())
+    override suspend fun fetchTicketsByCompany(
+        companyId: String,
+        conductorId: String?
+    ): Result<List<TicketEntity>> = Result.success(emptyList())
     override suspend fun pushBus(bus: BusEntity): Result<Unit> = Result.success(Unit)
     override suspend fun deleteBus(busId: String): Result<Unit> = Result.success(Unit)
     override suspend fun pushRoute(route: RouteEntity): Result<Unit> = Result.success(Unit)

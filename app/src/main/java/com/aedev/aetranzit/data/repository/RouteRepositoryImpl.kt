@@ -11,10 +11,15 @@ import com.aedev.aetranzit.domain.model.Route
 import com.aedev.aetranzit.domain.model.RouteStop
 import com.aedev.aetranzit.domain.repository.RouteRepository
 import com.aedev.aetranzit.domain.repository.SyncPreferencesRepository
+import com.aedev.aetranzit.domain.sync.NoOpSyncScheduler
+import com.aedev.aetranzit.domain.sync.SyncScheduler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -25,19 +30,44 @@ import javax.inject.Singleton
 class RouteRepositoryImpl @Inject constructor(
     private val routeDao: RouteDao,
     private val tripDao: TripDao,
+    private val activeCompanyProvider: ActiveCompanyProvider,
     private val syncPreferencesRepository: SyncPreferencesRepository,
     private val fleetSyncDataSource: FleetSyncRemoteDataSource,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val syncScheduler: SyncScheduler = NoOpSyncScheduler
 ) : RouteRepository {
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeAllRoutes(): Flow<List<Route>> =
-        routeDao.observeAll().map { entities -> entities.map { it.toDomain() } }
+        activeCompanyProvider.observeActiveCompanyId().flatMapLatest { companyId ->
+            if (companyId.isNullOrBlank()) {
+                flowOf(emptyList())
+            } else {
+                routeDao.observeByCompany(companyId).map { entities ->
+                    entities.map { it.toDomain() }
+                }
+            }
+        }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeRouteById(id: String): Flow<Route?> =
-        routeDao.observeById(id).map { it?.toDomain() }
+        activeCompanyProvider.observeActiveCompanyId().flatMapLatest { companyId ->
+            if (companyId.isNullOrBlank()) {
+                flowOf(null)
+            } else {
+                routeDao.observeByIdAndCompany(id, companyId).map { it?.toDomain() }
+            }
+        }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeUnsyncedCount(): Flow<Int> =
-        routeDao.observeUnsyncedCount()
+        activeCompanyProvider.observeActiveCompanyId().flatMapLatest { companyId ->
+            if (companyId.isNullOrBlank()) {
+                flowOf(0)
+            } else {
+                routeDao.observeUnsyncedCountByCompany(companyId)
+            }
+        }
 
     override suspend fun saveRoute(
         id: String?,
@@ -47,6 +77,7 @@ class RouteRepositoryImpl @Inject constructor(
         stops: List<RouteStop>
     ): Result<Route> = withContext(ioDispatcher) {
         try {
+            val companyId = activeCompanyProvider.requireActiveCompanyId()
             val trimmedOrigin = origin.trim()
             val trimmedDest = destination.trim()
             if (trimmedOrigin.isEmpty()) {
@@ -81,13 +112,24 @@ class RouteRepositoryImpl @Inject constructor(
                 RouteStop(name = stopName, fare = stop.fare)
             }
 
+            val resolvedId = if (!id.isNullOrBlank()) {
+                val existing = routeDao.getByIdAndCompany(id, companyId)
+                    ?: return@withContext Result.failure(
+                        IllegalArgumentException("Route not found in your company.")
+                    )
+                existing.id
+            } else {
+                UUID.randomUUID().toString()
+            }
+
             val now = System.currentTimeMillis()
             var entity = RouteEntity(
-                id = id?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString(),
+                id = resolvedId,
                 origin = trimmedOrigin,
                 destination = trimmedDest,
                 baseFare = baseFare,
                 stopsJson = RouteStopsJsonCodec.encode(cleanedStops),
+                companyId = companyId,
                 isSynced = false,
                 updatedAt = now
             )
@@ -100,6 +142,7 @@ class RouteRepositoryImpl @Inject constructor(
                     syncPreferencesRepository.updateLastSyncedAt(syncedAt)
                     entity = entity.copy(isSynced = true, updatedAt = syncedAt)
                 }
+                syncScheduler.enqueueImmediateSync()
             }
             Result.success(entity.toDomain())
         } catch (ce: CancellationException) {
@@ -111,14 +154,19 @@ class RouteRepositoryImpl @Inject constructor(
 
     override suspend fun deleteRoute(id: String): Result<Unit> = withContext(ioDispatcher) {
         try {
-            if (tripDao.countActiveTripsByRoute(id) > 0) {
+            val companyId = activeCompanyProvider.requireActiveCompanyId()
+            val existing = routeDao.getByIdAndCompany(id, companyId)
+                ?: return@withContext Result.failure(
+                    IllegalArgumentException("Route not found in your company.")
+                )
+            if (tripDao.countActiveTripsByRoute(existing.id, companyId) > 0) {
                 return@withContext Result.failure(
                     IllegalStateException("Cannot delete a route while an active trip is running on it.")
                 )
             }
-            routeDao.deleteById(id)
+            routeDao.deleteByIdAndCompany(existing.id, companyId)
             if (syncPreferencesRepository.isCloudSyncEnabled.first()) {
-                fleetSyncDataSource.deleteRoute(id)
+                fleetSyncDataSource.deleteRoute(existing.id)
             }
             Result.success(Unit)
         } catch (ce: CancellationException) {
@@ -135,7 +183,10 @@ class RouteRepositoryImpl @Inject constructor(
                     IllegalStateException("Enable Cloud Sync in Settings before syncing.")
                 )
             }
-            val unsynced = routeDao.getUnsynced()
+            val companyId = activeCompanyProvider.getActiveCompanyId()
+                ?: return@withContext Result.success(0)
+
+            val unsynced = routeDao.getUnsyncedByCompany(companyId)
             var syncedCount = 0
             for (route in unsynced) {
                 if (fleetSyncDataSource.pushRoute(route).isSuccess) {

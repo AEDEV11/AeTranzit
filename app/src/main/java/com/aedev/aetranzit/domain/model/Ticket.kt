@@ -7,6 +7,7 @@ data class Ticket(
     val tripId: String,
     val busId: String,
     val conductorId: String,
+    val companyId: String = Company.DEFAULT_COMPANY_ID,
     val seatNumber: String,
     val destination: String,
     val passengerType: PassengerType,

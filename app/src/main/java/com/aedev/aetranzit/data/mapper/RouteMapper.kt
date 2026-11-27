@@ -10,6 +10,7 @@ fun RouteEntity.toDomain(): Route = Route(
     destination = destination,
     baseFare = baseFare,
     stops = RouteStopsJsonCodec.decode(stopsJson),
+    companyId = companyId,
     isSynced = isSynced,
     updatedAt = updatedAt
 )
@@ -20,6 +21,7 @@ fun Route.toEntity(): RouteEntity = RouteEntity(
     destination = destination,
     baseFare = baseFare,
     stopsJson = RouteStopsJsonCodec.encode(stops),
+    companyId = companyId,
     isSynced = isSynced,
     updatedAt = updatedAt
 )

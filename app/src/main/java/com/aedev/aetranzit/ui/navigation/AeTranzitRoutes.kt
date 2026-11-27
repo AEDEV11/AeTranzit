@@ -1,11 +1,14 @@
 package com.aedev.aetranzit.ui.navigation
 
+import com.aedev.aetranzit.domain.model.User
 import com.aedev.aetranzit.domain.model.UserRole
 
 object AeTranzitRoutes {
     const val SPLASH = "splash"
     const val LOGIN = "login"
     const val REGISTER = "register"
+    const val COMPANY_SETUP = "company_setup"
+    const val FORCE_CHANGE_PASSWORD = "force_change_password"
 
     const val ADMIN_DASHBOARD = "admin_dashboard"
     const val ADMIN_BUSES = "admin_buses"
@@ -28,5 +31,11 @@ object AeTranzitRoutes {
     fun homeRouteFor(role: UserRole): String = when (role) {
         UserRole.ADMIN -> ADMIN_DASHBOARD
         UserRole.CONDUCTOR -> CONDUCTOR_HOME
+    }
+
+    fun postAuthRouteFor(user: User): String = when {
+        user.mustChangePassword -> FORCE_CHANGE_PASSWORD
+        user.role == UserRole.ADMIN && user.companyId.isBlank() -> COMPANY_SETUP
+        else -> homeRouteFor(user.role)
     }
 }

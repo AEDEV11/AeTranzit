@@ -3,7 +3,6 @@ package com.aedev.aetranzit.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aedev.aetranzit.domain.model.User
-import com.aedev.aetranzit.domain.model.UserRole
 import com.aedev.aetranzit.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
@@ -20,7 +19,6 @@ data class AuthUiState(
     val email: String = "",
     val password: String = "",
     val confirmPassword: String = "",
-    val selectedRole: UserRole = UserRole.CONDUCTOR,
     val isPasswordVisible: Boolean = false,
     val isLoading: Boolean = false,
     val nameError: String? = null,
@@ -35,7 +33,6 @@ sealed interface AuthUiEvent {
     data class EmailChanged(val value: String) : AuthUiEvent
     data class PasswordChanged(val value: String) : AuthUiEvent
     data class ConfirmPasswordChanged(val value: String) : AuthUiEvent
-    data class RoleSelected(val role: UserRole) : AuthUiEvent
     data object TogglePasswordVisibility : AuthUiEvent
     data object SubmitLogin : AuthUiEvent
     data object SubmitRegister : AuthUiEvent
@@ -70,9 +67,6 @@ class AuthViewModel @Inject constructor(
             }
             is AuthUiEvent.ConfirmPasswordChanged -> _uiState.update {
                 it.copy(confirmPassword = event.value, confirmPasswordError = null, generalError = null)
-            }
-            is AuthUiEvent.RoleSelected -> _uiState.update {
-                it.copy(selectedRole = event.role, generalError = null)
             }
             AuthUiEvent.TogglePasswordVisibility -> _uiState.update {
                 it.copy(isPasswordVisible = !it.isPasswordVisible)
@@ -135,7 +129,12 @@ class AuthViewModel @Inject constructor(
             null
         }
 
-        if (nameError != null || emailError != null || passwordError != null || confirmError != null) {
+        if (
+            nameError != null ||
+            emailError != null ||
+            passwordError != null ||
+            confirmError != null
+        ) {
             _uiState.update {
                 it.copy(
                     nameError = nameError,
@@ -149,12 +148,13 @@ class AuthViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, generalError = null) }
+            _uiState.update {
+                it.copy(isLoading = true, generalError = null)
+            }
             authRepository.register(
                 name = current.name,
                 email = current.email,
-                password = current.password,
-                role = current.selectedRole
+                password = current.password
             ).onSuccess { user ->
                 _uiState.update { it.copy(isLoading = false) }
                 _effects.send(AuthEffect.Authenticated(user))
@@ -162,7 +162,7 @@ class AuthViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        generalError = error.message ?: "Unable to create account."
+                        generalError = error.message ?: "Unable to create Admin account."
                     )
                 }
             }
@@ -180,7 +180,8 @@ class AuthViewModel @Inject constructor(
 
     private fun validatePassword(password: String): String? = when {
         password.isEmpty() -> "Password is required."
-        password.length < MIN_PASSWORD_LENGTH -> "Password must be at least $MIN_PASSWORD_LENGTH characters."
+        password.length < MIN_PASSWORD_LENGTH ->
+            "Password must be at least $MIN_PASSWORD_LENGTH characters."
         else -> null
     }
 

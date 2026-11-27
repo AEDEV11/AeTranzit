@@ -10,7 +10,19 @@ interface AuthRepository {
     fun observeUnsyncedCount(): Flow<Int>
     suspend fun getCurrentUser(): User?
     suspend fun login(email: String, password: String): Result<User>
-    suspend fun register(name: String, email: String, password: String, role: UserRole): Result<User>
+    suspend fun register(
+        name: String,
+        email: String,
+        password: String
+    ): Result<User>
+    suspend fun completeCompanySetup(companyName: String): Result<User>
+    suspend fun createStaffAccount(
+        name: String,
+        email: String,
+        temporaryPassword: String,
+        role: UserRole = UserRole.CONDUCTOR
+    ): Result<User>
+    suspend fun completeForcedPasswordChange(newPassword: String): Result<User>
     suspend fun setUserActiveStatus(userId: String, isActive: Boolean): Result<Unit>
     suspend fun syncPendingUsers(): Result<Int>
     suspend fun logout()

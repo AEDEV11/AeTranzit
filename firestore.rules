@@ -1,0 +1,594 @@
+rules_version = '2';
+
+// ===============================================================
+// AeTranzit — Cloud Firestore Security Rules (Project: aetranzit)
+// Phase 9: Admin-Only Registration, Separate Business Setup &
+//          Admin-Provisioned Staff with Forced Password Change
+// ===============================================================
+//
+// Assumed Data Model (synced from Offline-First Android Room v3 + Cloud SSOT):
+//
+// 0. Collection: companies/{companyId}
+//    - id: string (required, == companyId, 1..64, immutable)
+//    - name: string (required, 2..120)
+//    - joinCode: string (required, '^[A-Z0-9]{3}-[0-9]{4}$', immutable on update)
+//    - ownerUid: string (optional, 1..128, immutable once set — binds founding Admin UID)
+//    - createdAt: int (required, epoch millis > 0, immutable)
+//    - updatedAt: int (required, epoch millis > 0)
+//
+// 1. Collection: users/{uid}
+//    - id: string (required, 1..64, immutable on non-admin update)
+//    - name: string (required, 1..120)
+//    - email: string (required, valid email <= 254, immutable on non-admin update)
+//    - role: string (required, 'ADMIN' | 'CONDUCTOR', immutable on non-admin update)
+//    - companyId: string (required, "" allowed ONLY for unconfigured 'ADMIN', else 1..64;
+//                 one-time assignment "" -> founder companyId allowed, strictly immutable once set)
+//    - isActive: bool (required, immutable on non-admin update)
+//    - mustChangePassword: bool (optional on legacy v2 docs, bool when present;
+//                          active user may clear true -> false on own profile)
+//    - updatedAt: int (required, epoch millis > 0)
+//
+// 2. Collection: buses/{busId}
+//    - id: string (required, == busId, 1..64, immutable)
+//    - busNumber: string (required, 1..40)
+//    - plateNumber: string (required, 1..40)
+//    - totalSeats: int (required, 1..120)
+//    - columns: int (required, 4 | 5)
+//    - companyId: string (required, == userCompanyId(), immutable on update)
+//    - updatedAt: int (required, epoch millis > 0)
+//
+// 3. Collection: routes/{routeId}
+//    - id: string (required, == routeId, 1..64, immutable)
+//    - origin: string (required, 1..120)
+//    - destination: string (required, 1..120)
+//    - baseFare: number (required, > 0, <= 100000)
+//    - stops: list (optional, <= 100 entries)
+//    - stopsJson: string (optional, <= 20000 chars)
+//    - companyId: string (required, == userCompanyId(), immutable on update)
+//    - updatedAt: int (required, epoch millis > 0)
+//
+// 4. Collection: trips/{tripId}
+//    - id: string (required, == tripId, 1..64, immutable)
+//    - busId: string (required, 1..64, immutable)
+//    - routeId: string (required, 1..64, immutable)
+//    - conductorId: string (required, 1..64, immutable)
+//    - companyId: string (required, == userCompanyId(), immutable)
+//    - status: string (required, 'ACTIVE' | 'COMPLETED')
+//    - startedAt: int (required, epoch millis > 0, immutable)
+//    - endedAt: int | null (optional, >= startedAt when int)
+//    - occupiedSeats: list<string> (optional, <= 120 entries, updated atomically with tickets)
+//    - updatedAt: int (required, epoch millis > 0)
+//
+// 5. Collection: tickets/{ticketId}
+//    - id: string (required, == ticketId, 1..64, immutable)
+//    - tripId: string (required, 1..64, immutable)
+//    - busId: string (required, 1..64, immutable)
+//    - conductorId: string (required, 1..64, immutable)
+//    - companyId: string (required, == userCompanyId(), immutable)
+//    - seatNumber: string (required, 1..16, immutable)
+//    - destination: string (required, 1..120, immutable)
+//    - passengerType: string (required, 'REGULAR' | 'STUDENT' | 'SENIOR' | 'PWD', immutable)
+//    - fareAmount: number (required, > 0, <= 100000, immutable)
+//    - cashTendered: number (required, >= fareAmount, <= 1000000, immutable)
+//    - changeAmount: number (required, >= 0, <= 1000000, immutable)
+//    - status: string (required, 'ACTIVE' | 'DROPPED_OFF')
+//    - createdAt: int (required, epoch millis > 0, immutable)
+//    - updatedAt: int (required, epoch millis > 0)
+//
+// Public Web Verification Note:
+// Unauthenticated reads on ALL collections are strictly DENIED. Passenger QR verification
+// (`/t/:ticketId`) is served exclusively by the `viewTicket` Cloud Function via Admin SDK.
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===========================================================
+    // Core Auth, Role & Multi-Tenant Company Helpers
+    // ===========================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDocPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function companyDocPath(companyId) {
+      return /databases/$(database)/documents/companies/$(companyId);
+    }
+
+    function hasUserProfile() {
+      return isSignedIn() && exists(userDocPath());
+    }
+
+    function userProfile() {
+      return get(userDocPath()).data;
+    }
+
+    function userRole() {
+      return hasUserProfile() && ('role' in userProfile())
+        ? userProfile().role
+        : '';
+    }
+
+    function userCompanyId() {
+      return hasUserProfile() &&
+        ('companyId' in userProfile()) &&
+        userProfile().companyId is string
+        ? userProfile().companyId
+        : '';
+    }
+
+    function isSameCompany(companyId) {
+      return companyId is string &&
+        companyId.size() >= 1 &&
+        userCompanyId().size() >= 1 &&
+        companyId == userCompanyId();
+    }
+
+    function isActiveUser() {
+      return hasUserProfile() &&
+        ('isActive' in userProfile()) &&
+        userProfile().isActive == true;
+    }
+
+    function isAdmin() {
+      return isActiveUser() && userRole() == 'ADMIN';
+    }
+
+    function isConductor() {
+      return isActiveUser() && userRole() == 'CONDUCTOR';
+    }
+
+    function isActiveStaff() {
+      return isAdmin() || isConductor();
+    }
+
+    // Matches either the Firebase Auth UID or the synced Room UUID stored in users/{auth.uid}.id
+    function isOwningConductor(conductorId) {
+      return isConductor() &&
+        conductorId is string &&
+        conductorId.size() >= 1 &&
+        (
+          conductorId == request.auth.uid ||
+          ('id' in userProfile() && conductorId == userProfile().id)
+        );
+    }
+
+    // Verifies that an ADMIN account is the legitimate founder of a newly created company
+    // (either committed in the same atomic WriteBatch or immediately prior), preventing
+    // privilege escalation into any other existing tenant's companyId.
+    function isCompanyFounder(companyId) {
+      return isBoundedString(companyId, 1, 64) && (
+        (
+          exists(companyDocPath(companyId)) &&
+          ('ownerUid' in get(companyDocPath(companyId)).data) &&
+          get(companyDocPath(companyId)).data.ownerUid == request.auth.uid
+        ) ||
+        (
+          !exists(companyDocPath(companyId)) &&
+          existsAfter(companyDocPath(companyId)) &&
+          ('ownerUid' in getAfter(companyDocPath(companyId)).data) &&
+          getAfter(companyDocPath(companyId)).data.ownerUid == request.auth.uid
+        )
+      );
+    }
+
+    function existingMustChangePassword(data) {
+      return ('mustChangePassword' in data) && data.mustChangePassword == true;
+    }
+
+    // ===========================================================
+    // Generic Validation Helpers
+    // ===========================================================
+
+    function hasRequiredFields(data, fields) {
+      return data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(data, fields) {
+      return data.keys().hasOnly(fields);
+    }
+
+    function isBoundedString(value, minLen, maxLen) {
+      return value is string && value.size() >= minLen && value.size() <= maxLen;
+    }
+
+    function isValidEmail(email) {
+      return isBoundedString(email, 3, 254) &&
+        email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    }
+
+    function isPositiveEpochMillis(ts) {
+      return ts is int && ts > 0;
+    }
+
+    // ===========================================================
+    // Domain Validators (Called on BOTH create and update)
+    // ===========================================================
+
+    function isValidCompany(data, companyId) {
+      return hasRequiredFields(data, ['id', 'name', 'joinCode', 'createdAt', 'updatedAt']) &&
+        hasOnlyAllowedFields(data, ['id', 'name', 'joinCode', 'ownerUid', 'createdAt', 'updatedAt']) &&
+        data.id == companyId &&
+        isBoundedString(data.id, 1, 64) &&
+        isBoundedString(data.name, 2, 120) &&
+        isBoundedString(data.joinCode, 8, 8) &&
+        data.joinCode.matches('^[A-Z0-9]{3}-[0-9]{4}$') &&
+        (!('ownerUid' in data) || isBoundedString(data.ownerUid, 1, 128)) &&
+        isPositiveEpochMillis(data.createdAt) &&
+        isPositiveEpochMillis(data.updatedAt);
+    }
+
+    function isValidUser(data) {
+      return hasRequiredFields(data, ['id', 'name', 'email', 'role', 'companyId', 'isActive', 'updatedAt']) &&
+        hasOnlyAllowedFields(data, ['id', 'name', 'email', 'role', 'companyId', 'isActive', 'mustChangePassword', 'updatedAt']) &&
+        isBoundedString(data.id, 1, 64) &&
+        isBoundedString(data.name, 1, 120) &&
+        isValidEmail(data.email) &&
+        data.role in ['ADMIN', 'CONDUCTOR'] &&
+        (
+          isBoundedString(data.companyId, 1, 64) ||
+          (data.role == 'ADMIN' && data.companyId is string && data.companyId == '')
+        ) &&
+        data.isActive is bool &&
+        (!('mustChangePassword' in data) || data.mustChangePassword is bool) &&
+        isPositiveEpochMillis(data.updatedAt);
+    }
+
+    function isValidBus(data, busId) {
+      return hasRequiredFields(data, ['id', 'busNumber', 'plateNumber', 'totalSeats', 'columns', 'companyId', 'updatedAt']) &&
+        hasOnlyAllowedFields(data, ['id', 'busNumber', 'plateNumber', 'totalSeats', 'columns', 'companyId', 'updatedAt']) &&
+        data.id == busId &&
+        isBoundedString(data.id, 1, 64) &&
+        isBoundedString(data.busNumber, 1, 40) &&
+        isBoundedString(data.plateNumber, 1, 40) &&
+        data.totalSeats is int && data.totalSeats >= 1 && data.totalSeats <= 120 &&
+        data.columns in [4, 5] &&
+        isBoundedString(data.companyId, 1, 64) &&
+        isPositiveEpochMillis(data.updatedAt);
+    }
+
+    function isValidRoute(data, routeId) {
+      return hasRequiredFields(data, ['id', 'origin', 'destination', 'baseFare', 'companyId', 'updatedAt']) &&
+        hasOnlyAllowedFields(data, ['id', 'origin', 'destination', 'baseFare', 'stops', 'stopsJson', 'companyId', 'updatedAt']) &&
+        data.id == routeId &&
+        isBoundedString(data.id, 1, 64) &&
+        isBoundedString(data.origin, 1, 120) &&
+        isBoundedString(data.destination, 1, 120) &&
+        data.baseFare is number && data.baseFare > 0 && data.baseFare <= 100000 &&
+        (!('stops' in data) || (data.stops is list && data.stops.size() <= 100)) &&
+        (!('stopsJson' in data) || isBoundedString(data.stopsJson, 2, 20000)) &&
+        isBoundedString(data.companyId, 1, 64) &&
+        isPositiveEpochMillis(data.updatedAt);
+    }
+
+    function isValidTrip(data, tripId) {
+      return hasRequiredFields(data, [
+          'id',
+          'busId',
+          'routeId',
+          'conductorId',
+          'companyId',
+          'status',
+          'startedAt',
+          'updatedAt'
+        ]) &&
+        hasOnlyAllowedFields(data, [
+          'id',
+          'busId',
+          'routeId',
+          'conductorId',
+          'companyId',
+          'status',
+          'startedAt',
+          'endedAt',
+          'occupiedSeats',
+          'updatedAt'
+        ]) &&
+        data.id == tripId &&
+        isBoundedString(data.id, 1, 64) &&
+        isBoundedString(data.busId, 1, 64) &&
+        isBoundedString(data.routeId, 1, 64) &&
+        isBoundedString(data.conductorId, 1, 64) &&
+        isBoundedString(data.companyId, 1, 64) &&
+        data.status in ['ACTIVE', 'COMPLETED'] &&
+        isPositiveEpochMillis(data.startedAt) &&
+        (!('endedAt' in data) || data.endedAt == null || (data.endedAt is int && data.endedAt >= data.startedAt)) &&
+        (!('occupiedSeats' in data) || (data.occupiedSeats is list && data.occupiedSeats.size() <= 120)) &&
+        isPositiveEpochMillis(data.updatedAt);
+    }
+
+    function isValidTicket(data, ticketId) {
+      return hasRequiredFields(data, [
+          'id',
+          'tripId',
+          'busId',
+          'conductorId',
+          'companyId',
+          'seatNumber',
+          'destination',
+          'passengerType',
+          'fareAmount',
+          'cashTendered',
+          'changeAmount',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        hasOnlyAllowedFields(data, [
+          'id',
+          'tripId',
+          'busId',
+          'conductorId',
+          'companyId',
+          'seatNumber',
+          'destination',
+          'passengerType',
+          'fareAmount',
+          'cashTendered',
+          'changeAmount',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.id == ticketId &&
+        isBoundedString(data.id, 1, 64) &&
+        isBoundedString(data.tripId, 1, 64) &&
+        isBoundedString(data.busId, 1, 64) &&
+        isBoundedString(data.conductorId, 1, 64) &&
+        isBoundedString(data.companyId, 1, 64) &&
+        isBoundedString(data.seatNumber, 1, 16) &&
+        isBoundedString(data.destination, 1, 120) &&
+        data.passengerType in ['REGULAR', 'STUDENT', 'SENIOR', 'PWD'] &&
+        data.fareAmount is number && data.fareAmount > 0 && data.fareAmount <= 100000 &&
+        data.cashTendered is number && data.cashTendered >= data.fareAmount && data.cashTendered <= 1000000 &&
+        data.changeAmount is number && data.changeAmount >= 0 && data.changeAmount <= 1000000 &&
+        data.status in ['ACTIVE', 'DROPPED_OFF'] &&
+        isPositiveEpochMillis(data.createdAt) &&
+        isPositiveEpochMillis(data.updatedAt);
+    }
+
+    // ===========================================================
+    // Collection Rules (Strict Tenant Isolation via userCompanyId())
+    // ===========================================================
+
+    match /companies/{companyId} {
+      // Authenticated users can read their own company metadata; zero unauthenticated public reads.
+      allow read: if isSignedIn();
+
+      // Creatable during Admin Business Setup (bound to request.auth.uid as ownerUid)
+      // or by an existing active ADMIN syncing their offline company record.
+      allow create: if isSignedIn() &&
+        isValidCompany(request.resource.data, companyId) &&
+        (
+          ('ownerUid' in request.resource.data && request.resource.data.ownerUid == request.auth.uid) ||
+          (isAdmin() && isSameCompany(companyId))
+        );
+
+      // Updatable only by an active ADMIN belonging to this exact companyId;
+      // id, joinCode, createdAt, and ownerUid are immutable once created.
+      allow update: if isAdmin() &&
+        isSameCompany(companyId) &&
+        isValidCompany(request.resource.data, companyId) &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.joinCode == resource.data.joinCode &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        (
+          !('ownerUid' in resource.data) ||
+          ('ownerUid' in request.resource.data && request.resource.data.ownerUid == resource.data.ownerUid)
+        );
+
+      allow delete: if false;
+    }
+
+    match /users/{uid} {
+      // Users can read their own profile; active ADMIN can only read/list staff in their own company
+      allow get: if isSignedIn() && (
+        request.auth.uid == uid ||
+        (isAdmin() && (resource == null || isSameCompany(resource.data.companyId)))
+      );
+      allow list: if isAdmin() && isSameCompany(resource.data.companyId);
+
+      // Staff & Admin creation:
+      // 1) Active ADMIN provisioning staff (Conductor or Co-Admin) within their own non-empty companyId
+      //    (requiring mustChangePassword == true), OR
+      // 2) Self-registering ADMIN creating their own initial profile (companyId == "" before setup,
+      //    or isCompanyFounder(companyId) if registered & configured offline prior to first sync).
+      allow create: if isValidUser(request.resource.data) &&
+        ('mustChangePassword' in request.resource.data) &&
+        request.resource.data.mustChangePassword is bool &&
+        (
+          (
+            isAdmin() &&
+            isSameCompany(request.resource.data.companyId) &&
+            request.resource.data.mustChangePassword == true
+          ) ||
+          (
+            isSignedIn() &&
+            request.auth.uid == uid &&
+            !hasUserProfile() &&
+            request.resource.data.role == 'ADMIN' &&
+            request.resource.data.isActive == true &&
+            request.resource.data.mustChangePassword == false &&
+            (
+              request.auth.token.email == null ||
+              request.resource.data.email.lower() == request.auth.token.email.lower()
+            ) &&
+            (
+              request.resource.data.companyId == '' ||
+              isCompanyFounder(request.resource.data.companyId)
+            )
+          )
+        );
+
+      // Update rules:
+      // 1) One-time founder Business Setup: active ADMIN whose companyId == "" assigning their
+      //    newly founded companyId (verified via isCompanyFounder), OR
+      // 2) Active ADMIN managing staff within their own non-empty companyId (companyId immutable;
+      //    self-deactivation blocked), OR
+      // 3) Active user updating their own profile (e.g., clearing mustChangePassword true -> false
+      //    after setting a new password; id, email, role, companyId, and isActive strictly immutable).
+      allow update: if isValidUser(request.resource.data) &&
+        ('mustChangePassword' in request.resource.data) &&
+        request.resource.data.mustChangePassword is bool &&
+        (
+          (
+            isSignedIn() &&
+            request.auth.uid == uid &&
+            resource.data.role == 'ADMIN' &&
+            resource.data.isActive == true &&
+            resource.data.companyId == '' &&
+            isCompanyFounder(request.resource.data.companyId) &&
+            request.resource.data.id == resource.data.id &&
+            request.resource.data.email == resource.data.email &&
+            request.resource.data.role == 'ADMIN' &&
+            request.resource.data.isActive == true &&
+            request.resource.data.mustChangePassword == existingMustChangePassword(resource.data)
+          ) ||
+          (
+            request.resource.data.companyId == resource.data.companyId &&
+            (
+              (
+                isAdmin() &&
+                isSameCompany(resource.data.companyId) &&
+                !(request.auth.uid == uid && request.resource.data.isActive == false)
+              ) ||
+              (
+                isSignedIn() &&
+                request.auth.uid == uid &&
+                resource.data.isActive == true &&
+                request.resource.data.id == resource.data.id &&
+                request.resource.data.email == resource.data.email &&
+                request.resource.data.role == resource.data.role &&
+                request.resource.data.isActive == resource.data.isActive &&
+                (
+                  request.resource.data.mustChangePassword == existingMustChangePassword(resource.data) ||
+                  (existingMustChangePassword(resource.data) && request.resource.data.mustChangePassword == false)
+                )
+              )
+            )
+          )
+        );
+
+      allow delete: if false;
+    }
+
+    match /buses/{busId} {
+      allow get: if isActiveStaff() && (resource == null || isSameCompany(resource.data.companyId));
+      allow list: if isActiveStaff() && isSameCompany(resource.data.companyId);
+
+      allow create: if isAdmin() &&
+        isValidBus(request.resource.data, busId) &&
+        isSameCompany(request.resource.data.companyId);
+
+      allow update: if isAdmin() &&
+        isSameCompany(resource.data.companyId) &&
+        isValidBus(request.resource.data, busId) &&
+        request.resource.data.companyId == resource.data.companyId;
+
+      allow delete: if isAdmin() && isSameCompany(resource.data.companyId);
+    }
+
+    match /routes/{routeId} {
+      allow get: if isActiveStaff() && (resource == null || isSameCompany(resource.data.companyId));
+      allow list: if isActiveStaff() && isSameCompany(resource.data.companyId);
+
+      allow create: if isAdmin() &&
+        isValidRoute(request.resource.data, routeId) &&
+        isSameCompany(request.resource.data.companyId);
+
+      allow update: if isAdmin() &&
+        isSameCompany(resource.data.companyId) &&
+        isValidRoute(request.resource.data, routeId) &&
+        request.resource.data.companyId == resource.data.companyId;
+
+      allow delete: if isAdmin() && isSameCompany(resource.data.companyId);
+    }
+
+    match /trips/{tripId} {
+      allow get: if (isAdmin() && (resource == null || isSameCompany(resource.data.companyId))) ||
+        (
+          isConductor() &&
+          (
+            resource == null ||
+            (isSameCompany(resource.data.companyId) && isOwningConductor(resource.data.conductorId))
+          )
+        );
+
+      allow list: if isSameCompany(resource.data.companyId) &&
+        (isAdmin() || isOwningConductor(resource.data.conductorId));
+
+      allow create: if isValidTrip(request.resource.data, tripId) &&
+        isSameCompany(request.resource.data.companyId) &&
+        (isAdmin() || isOwningConductor(request.resource.data.conductorId));
+
+      allow update: if isSameCompany(resource.data.companyId) &&
+        isValidTrip(request.resource.data, tripId) &&
+        request.resource.data.companyId == resource.data.companyId &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.busId == resource.data.busId &&
+        request.resource.data.routeId == resource.data.routeId &&
+        request.resource.data.conductorId == resource.data.conductorId &&
+        request.resource.data.startedAt == resource.data.startedAt &&
+        (
+          isAdmin() ||
+          (
+            isOwningConductor(resource.data.conductorId) &&
+            !(resource.data.status == 'COMPLETED' && request.resource.data.status == 'ACTIVE')
+          )
+        );
+
+      allow delete: if isAdmin() && isSameCompany(resource.data.companyId);
+    }
+
+    match /tickets/{ticketId} {
+      // Strictly no public unauthenticated reads; viewTicket Cloud Function uses Admin SDK
+      allow get: if (isAdmin() && (resource == null || isSameCompany(resource.data.companyId))) ||
+        (
+          isConductor() &&
+          (
+            resource == null ||
+            (isSameCompany(resource.data.companyId) && isOwningConductor(resource.data.conductorId))
+          )
+        );
+
+      allow list: if isSameCompany(resource.data.companyId) &&
+        (isAdmin() || isOwningConductor(resource.data.conductorId));
+
+      allow create: if isValidTicket(request.resource.data, ticketId) &&
+        isSameCompany(request.resource.data.companyId) &&
+        (isAdmin() || isOwningConductor(request.resource.data.conductorId));
+
+      allow update: if isSameCompany(resource.data.companyId) &&
+        isValidTicket(request.resource.data, ticketId) &&
+        request.resource.data.companyId == resource.data.companyId &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.tripId == resource.data.tripId &&
+        request.resource.data.busId == resource.data.busId &&
+        request.resource.data.conductorId == resource.data.conductorId &&
+        request.resource.data.seatNumber == resource.data.seatNumber &&
+        request.resource.data.destination == resource.data.destination &&
+        request.resource.data.passengerType == resource.data.passengerType &&
+        request.resource.data.fareAmount == resource.data.fareAmount &&
+        request.resource.data.cashTendered == resource.data.cashTendered &&
+        request.resource.data.changeAmount == resource.data.changeAmount &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        (
+          isAdmin() ||
+          (
+            isOwningConductor(resource.data.conductorId) &&
+            !(resource.data.status == 'DROPPED_OFF' && request.resource.data.status == 'ACTIVE')
+          )
+        );
+
+      allow delete: if isAdmin() && isSameCompany(resource.data.companyId);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

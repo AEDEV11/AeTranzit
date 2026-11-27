@@ -76,6 +76,8 @@ import com.aedev.aetranzit.domain.model.Trip
 import com.aedev.aetranzit.domain.model.TripStatus
 import com.aedev.aetranzit.domain.usecase.FareCalculationResult
 import com.aedev.aetranzit.ui.components.AePrimaryButton
+import com.aedev.aetranzit.ui.components.SyncBadgeUiState
+import com.aedev.aetranzit.ui.components.SyncStatusBadge
 import com.aedev.aetranzit.ui.components.formatPhp
 import com.aedev.aetranzit.ui.theme.AeDimens
 import com.aedev.aetranzit.ui.theme.AeTranzitTheme
@@ -96,6 +98,8 @@ private enum class SeatVisualState {
 fun ConductorTicketingScreen(
     onNavigateBack: () -> Unit,
     onOpenDigitalTicket: ((String) -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
+    syncBadgeState: SyncBadgeUiState = SyncBadgeUiState(),
     viewModel: ConductorTicketingViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -111,8 +115,10 @@ fun ConductorTicketingScreen(
 
     ConductorTicketingContent(
         uiState = uiState,
+        syncBadgeState = syncBadgeState,
         onEvent = handleEvent,
-        onNavigateBack = onNavigateBack
+        onNavigateBack = onNavigateBack,
+        onOpenSettings = onOpenSettings
     )
 
     if (uiState.selectedSeatForIssue != null) {
@@ -162,7 +168,9 @@ fun ConductorTicketingContent(
     uiState: ConductorTicketingUiState,
     onEvent: (ConductorTicketingUiEvent) -> Unit,
     onNavigateBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    syncBadgeState: SyncBadgeUiState = SyncBadgeUiState(),
+    onOpenSettings: (() -> Unit)? = null
 ) {
     val bus = uiState.bus
     val columns = if (bus?.columns == 5) 5 else 4
@@ -182,7 +190,9 @@ fun ConductorTicketingContent(
                     Column {
                         Text(
                             text = "Seat Map & Ticketing",
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         if (uiState.route != null) {
                             Text(
@@ -205,6 +215,13 @@ fun ConductorTicketingContent(
                             contentDescription = "Back"
                         )
                     }
+                },
+                actions = {
+                    SyncStatusBadge(
+                        state = syncBadgeState,
+                        onClick = onOpenSettings,
+                        modifier = Modifier.padding(end = AeDimens.SpaceSm)
+                    )
                 }
             )
         }

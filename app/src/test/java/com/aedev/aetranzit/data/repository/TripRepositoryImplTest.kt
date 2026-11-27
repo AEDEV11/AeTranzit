@@ -4,10 +4,13 @@ import com.aedev.aetranzit.data.local.dao.BusDao
 import com.aedev.aetranzit.data.local.dao.RouteDao
 import com.aedev.aetranzit.data.local.dao.TripDao
 import com.aedev.aetranzit.data.local.entity.BusEntity
+import com.aedev.aetranzit.data.local.entity.CompanyEntity
 import com.aedev.aetranzit.data.local.entity.RouteEntity
 import com.aedev.aetranzit.data.local.entity.TicketEntity
 import com.aedev.aetranzit.data.local.entity.TripEntity
+import com.aedev.aetranzit.data.local.entity.UserEntity
 import com.aedev.aetranzit.data.remote.FleetSyncRemoteDataSource
+import com.aedev.aetranzit.domain.model.Company
 import com.aedev.aetranzit.domain.model.TripStatus
 import com.aedev.aetranzit.domain.repository.SyncPreferencesRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -31,6 +34,7 @@ class TripRepositoryImplTest {
     private lateinit var tripDao: InMemoryTripDao
     private lateinit var busDao: InMemoryBusDao
     private lateinit var routeDao: InMemoryRouteDao
+    private lateinit var companyProvider: FakeTripCompanyProvider
     private lateinit var syncPrefs: FakeSyncPreferencesRepository
     private lateinit var remoteSync: FakeFleetSyncRemoteDataSource
     private lateinit var repository: TripRepositoryImpl
@@ -40,6 +44,7 @@ class TripRepositoryImplTest {
         tripDao = InMemoryTripDao()
         busDao = InMemoryBusDao()
         routeDao = InMemoryRouteDao()
+        companyProvider = FakeTripCompanyProvider(Company.DEFAULT_COMPANY_ID)
         syncPrefs = FakeSyncPreferencesRepository()
         remoteSync = FakeFleetSyncRemoteDataSource()
 
@@ -50,6 +55,7 @@ class TripRepositoryImplTest {
                 plateNumber = "NCA-4821",
                 totalSeats = 45,
                 columns = 4,
+                companyId = Company.DEFAULT_COMPANY_ID,
                 isSynced = false,
                 updatedAt = 1L
             )
@@ -61,6 +67,7 @@ class TripRepositoryImplTest {
                 plateNumber = "NDB-9910",
                 totalSeats = 55,
                 columns = 5,
+                companyId = Company.DEFAULT_COMPANY_ID,
                 isSynced = false,
                 updatedAt = 1L
             )
@@ -72,6 +79,7 @@ class TripRepositoryImplTest {
                 destination = "Dau",
                 baseFare = 195.0,
                 stopsJson = "[]",
+                companyId = Company.DEFAULT_COMPANY_ID,
                 isSynced = false,
                 updatedAt = 1L
             )
@@ -81,6 +89,7 @@ class TripRepositoryImplTest {
             tripDao = tripDao,
             busDao = busDao,
             routeDao = routeDao,
+            activeCompanyProvider = companyProvider,
             syncPreferencesRepository = syncPrefs,
             fleetSyncDataSource = remoteSync,
             ioDispatcher = UnconfinedTestDispatcher()
@@ -139,6 +148,58 @@ class TripRepositoryImplTest {
         assertEquals(1, syncedCount)
         assertEquals(0, repository.observeUnsyncedCount().first())
     }
+
+    @Test
+    fun `multi-tenant isolation blocks cross-company bus or route trip creation and hides foreign trips`() = runTest {
+        busDao.upsert(
+            BusEntity(
+                id = "bus-foreign",
+                busNumber = "909",
+                plateNumber = "XYZ-9090",
+                totalSeats = 45,
+                columns = 4,
+                companyId = "company-b",
+                isSynced = false,
+                updatedAt = 1L
+            )
+        )
+        routeDao.upsert(
+            RouteEntity(
+                id = "route-foreign",
+                origin = "Pasay",
+                destination = "Nasugbu",
+                baseFare = 220.0,
+                stopsJson = "[]",
+                companyId = "company-b",
+                isSynced = false,
+                updatedAt = 1L
+            )
+        )
+
+        // Default company cannot start a trip with Company B's bus or route
+        assertTrue(repository.startTrip("cond-1", "bus-foreign", "route-1").isFailure)
+        assertTrue(repository.startTrip("cond-1", "bus-1", "route-foreign").isFailure)
+
+        val defaultCompanyTrip = repository.startTrip("cond-1", "bus-1", "route-1").getOrThrow()
+
+        // Switch session to Company B: Default company's trip is invisible
+        companyProvider.setCompanyId("company-b")
+        assertTrue(repository.observeAllTrips().first().isEmpty())
+        assertNull(repository.observeTripById(defaultCompanyTrip.id).first())
+        assertTrue(repository.endTrip(defaultCompanyTrip.id).isFailure)
+    }
+}
+
+private class FakeTripCompanyProvider(initialCompanyId: String?) : ActiveCompanyProvider {
+    private val state = MutableStateFlow(initialCompanyId)
+
+    fun setCompanyId(companyId: String?) {
+        state.value = companyId
+    }
+
+    override fun observeActiveCompanyId(): Flow<String?> = state
+
+    override suspend fun getActiveCompanyId(): String? = state.value
 }
 
 private class InMemoryTripDao : TripDao {
@@ -148,30 +209,54 @@ private class InMemoryTripDao : TripDao {
         items.value = items.value.filterNot { it.id == trip.id } + trip
     }
 
-    override fun observeAll(): Flow<List<TripEntity>> = items
+    override fun observeByCompany(companyId: String): Flow<List<TripEntity>> =
+        items.map { list -> list.filter { it.companyId == companyId } }
 
-    override fun observeByConductor(conductorId: String): Flow<List<TripEntity>> =
-        items.map { list -> list.filter { it.conductorId == conductorId } }
-
-    override fun observeActiveTripByConductor(conductorId: String): Flow<TripEntity?> =
+    override fun observeByConductor(
+        conductorId: String,
+        companyId: String
+    ): Flow<List<TripEntity>> =
         items.map { list ->
-            list.firstOrNull { it.conductorId == conductorId && it.status == "ACTIVE" }
+            list.filter { it.conductorId == conductorId && it.companyId == companyId }
         }
 
-    override suspend fun getActiveTripByConductor(conductorId: String): TripEntity? =
-        items.value.firstOrNull { it.conductorId == conductorId && it.status == "ACTIVE" }
+    override fun observeActiveTripByConductor(
+        conductorId: String,
+        companyId: String
+    ): Flow<TripEntity?> =
+        items.map { list ->
+            list.firstOrNull {
+                it.conductorId == conductorId &&
+                    it.companyId == companyId &&
+                    it.status == "ACTIVE"
+            }
+        }
 
-    override suspend fun countActiveTripsByBus(busId: String): Int =
-        items.value.count { it.busId == busId && it.status == "ACTIVE" }
+    override suspend fun getActiveTripByConductor(
+        conductorId: String,
+        companyId: String
+    ): TripEntity? =
+        items.value.firstOrNull {
+            it.conductorId == conductorId &&
+                it.companyId == companyId &&
+                it.status == "ACTIVE"
+        }
 
-    override suspend fun countActiveTripsByRoute(routeId: String): Int =
-        items.value.count { it.routeId == routeId && it.status == "ACTIVE" }
+    override suspend fun countActiveTripsByBus(busId: String, companyId: String): Int =
+        items.value.count {
+            it.busId == busId && it.companyId == companyId && it.status == "ACTIVE"
+        }
 
-    override fun observeById(id: String): Flow<TripEntity?> =
-        items.map { list -> list.firstOrNull { it.id == id } }
+    override suspend fun countActiveTripsByRoute(routeId: String, companyId: String): Int =
+        items.value.count {
+            it.routeId == routeId && it.companyId == companyId && it.status == "ACTIVE"
+        }
 
-    override suspend fun getById(id: String): TripEntity? =
-        items.value.firstOrNull { it.id == id }
+    override fun observeByIdAndCompany(id: String, companyId: String): Flow<TripEntity?> =
+        items.map { list -> list.firstOrNull { it.id == id && it.companyId == companyId } }
+
+    override suspend fun getByIdAndCompany(id: String, companyId: String): TripEntity? =
+        items.value.firstOrNull { it.id == id && it.companyId == companyId }
 
     override suspend fun markSynced(id: String, syncedAt: Long) {
         items.value = items.value.map {
@@ -179,11 +264,11 @@ private class InMemoryTripDao : TripDao {
         }
     }
 
-    override suspend fun getUnsynced(): List<TripEntity> =
-        items.value.filter { !it.isSynced }
+    override suspend fun getUnsyncedByCompany(companyId: String): List<TripEntity> =
+        items.value.filter { it.companyId == companyId && !it.isSynced }
 
-    override fun observeUnsyncedCount(): Flow<Int> =
-        items.map { list -> list.count { !it.isSynced } }
+    override fun observeUnsyncedCountByCompany(companyId: String): Flow<Int> =
+        items.map { list -> list.count { it.companyId == companyId && !it.isSynced } }
 }
 
 private class InMemoryBusDao : BusDao {
@@ -193,16 +278,17 @@ private class InMemoryBusDao : BusDao {
         items.value = items.value.filterNot { it.id == bus.id } + bus
     }
 
-    override fun observeAll(): Flow<List<BusEntity>> = items
+    override fun observeByCompany(companyId: String): Flow<List<BusEntity>> =
+        items.map { list -> list.filter { it.companyId == companyId } }
 
-    override fun observeById(id: String): Flow<BusEntity?> =
-        items.map { list -> list.firstOrNull { it.id == id } }
+    override fun observeByIdAndCompany(id: String, companyId: String): Flow<BusEntity?> =
+        items.map { list -> list.firstOrNull { it.id == id && it.companyId == companyId } }
 
-    override suspend fun getById(id: String): BusEntity? =
-        items.value.firstOrNull { it.id == id }
+    override suspend fun getByIdAndCompany(id: String, companyId: String): BusEntity? =
+        items.value.firstOrNull { it.id == id && it.companyId == companyId }
 
-    override suspend fun deleteById(id: String) {
-        items.value = items.value.filterNot { it.id == id }
+    override suspend fun deleteByIdAndCompany(id: String, companyId: String) {
+        items.value = items.value.filterNot { it.id == id && it.companyId == companyId }
     }
 
     override suspend fun markSynced(id: String, syncedAt: Long) {
@@ -211,10 +297,11 @@ private class InMemoryBusDao : BusDao {
         }
     }
 
-    override suspend fun getUnsynced(): List<BusEntity> = items.value.filter { !it.isSynced }
+    override suspend fun getUnsyncedByCompany(companyId: String): List<BusEntity> =
+        items.value.filter { it.companyId == companyId && !it.isSynced }
 
-    override fun observeUnsyncedCount(): Flow<Int> =
-        items.map { list -> list.count { !it.isSynced } }
+    override fun observeUnsyncedCountByCompany(companyId: String): Flow<Int> =
+        items.map { list -> list.count { it.companyId == companyId && !it.isSynced } }
 }
 
 private class InMemoryRouteDao : RouteDao {
@@ -224,16 +311,17 @@ private class InMemoryRouteDao : RouteDao {
         items.value = items.value.filterNot { it.id == route.id } + route
     }
 
-    override fun observeAll(): Flow<List<RouteEntity>> = items
+    override fun observeByCompany(companyId: String): Flow<List<RouteEntity>> =
+        items.map { list -> list.filter { it.companyId == companyId } }
 
-    override fun observeById(id: String): Flow<RouteEntity?> =
-        items.map { list -> list.firstOrNull { it.id == id } }
+    override fun observeByIdAndCompany(id: String, companyId: String): Flow<RouteEntity?> =
+        items.map { list -> list.firstOrNull { it.id == id && it.companyId == companyId } }
 
-    override suspend fun getById(id: String): RouteEntity? =
-        items.value.firstOrNull { it.id == id }
+    override suspend fun getByIdAndCompany(id: String, companyId: String): RouteEntity? =
+        items.value.firstOrNull { it.id == id && it.companyId == companyId }
 
-    override suspend fun deleteById(id: String) {
-        items.value = items.value.filterNot { it.id == id }
+    override suspend fun deleteByIdAndCompany(id: String, companyId: String) {
+        items.value = items.value.filterNot { it.id == id && it.companyId == companyId }
     }
 
     override suspend fun markSynced(id: String, syncedAt: Long) {
@@ -242,10 +330,11 @@ private class InMemoryRouteDao : RouteDao {
         }
     }
 
-    override suspend fun getUnsynced(): List<RouteEntity> = items.value.filter { !it.isSynced }
+    override suspend fun getUnsyncedByCompany(companyId: String): List<RouteEntity> =
+        items.value.filter { it.companyId == companyId && !it.isSynced }
 
-    override fun observeUnsyncedCount(): Flow<Int> =
-        items.map { list -> list.count { !it.isSynced } }
+    override fun observeUnsyncedCountByCompany(companyId: String): Flow<Int> =
+        items.map { list -> list.count { it.companyId == companyId && !it.isSynced } }
 }
 
 private class FakeSyncPreferencesRepository : SyncPreferencesRepository {
@@ -271,6 +360,25 @@ private class FakeSyncPreferencesRepository : SyncPreferencesRepository {
 }
 
 private class FakeFleetSyncRemoteDataSource : FleetSyncRemoteDataSource {
+    override suspend fun pushCompany(company: CompanyEntity): Result<Unit> = Result.success(Unit)
+    override suspend fun fetchCompanyByJoinCode(joinCode: String): Result<CompanyEntity?> =
+        Result.success(null)
+    override suspend fun fetchCompanyById(companyId: String): Result<CompanyEntity?> =
+        Result.success(null)
+    override suspend fun fetchUsersByCompany(companyId: String): Result<List<UserEntity>> =
+        Result.success(emptyList())
+    override suspend fun fetchBusesByCompany(companyId: String): Result<List<BusEntity>> =
+        Result.success(emptyList())
+    override suspend fun fetchRoutesByCompany(companyId: String): Result<List<RouteEntity>> =
+        Result.success(emptyList())
+    override suspend fun fetchTripsByCompany(
+        companyId: String,
+        conductorId: String?
+    ): Result<List<TripEntity>> = Result.success(emptyList())
+    override suspend fun fetchTicketsByCompany(
+        companyId: String,
+        conductorId: String?
+    ): Result<List<TicketEntity>> = Result.success(emptyList())
     override suspend fun pushBus(bus: BusEntity): Result<Unit> = Result.success(Unit)
     override suspend fun deleteBus(busId: String): Result<Unit> = Result.success(Unit)
     override suspend fun pushRoute(route: RouteEntity): Result<Unit> = Result.success(Unit)
